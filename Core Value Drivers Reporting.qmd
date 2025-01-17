@@ -1,0 +1,46 @@
+---
+title: "Core Value Drivers Reporting"
+format: html
+---
+
+# Internal Fill Rate
+
+- Pull “RRX – Employee Demographics” Report in Workday
+  - Effective as of Date: Last date in period of interest (e.g., 1/31/2025)
+  - Organization: Regal Rexnord Team (Louis Pinkham)
+- Pull "RRX - 9Box" Report in Workday *NEED ACCESS*
+  - Supervisory Organization: Regal Rexnord Team (Louis Pinkham)
+  - Include Subordinate Organizations
+  - Click hyperlink "Toal" above visual 9Box
+  - Export to Excel
+
+```{r}
+#| warning: false
+library(tidyverse)
+
+employment_demographics <- readxl::read_xlsx("inputs/RRX - Employment Demographics.xlsx", 
+                                             skip = 12) |> 
+  janitor::clean_names()
+
+ninebox_time_in_position <- readxl::read_xlsx()
+```
+
+- Add column [Internal/External]
+  - If Hire Date = [Time in Job Profile Start Date] then "External"
+  - If Hire Date < [Time in Job Profile Start Date] then "Internal"
+- Filter on [Time in Job Profile Start Date]
+  - (1/1/{yyyy}) < [Time in Job Profile Start Date] < Last day in period
+  - Feb update example: 1/1/2025 < [Time in Job Profile Start Date] < 1/31/2025
+- Filter on [Career Level]
+  - Career Level != M1
+  
+```{r}
+employment_demographics <- employment_demographics |> 
+  filter(!career_level %in% c("AT1", "AT2", "AT3", "M1") & !is.na(career_level))
+```
+
+  
+TO DO:
+- Add Time in Job Profile Start Date to reports (Potentially WQL Alias: timeInJobProfileStartDate)
+- Get access to RRX - 9Box Report (time in job profile)
+- Clarify career_levels to exclude
