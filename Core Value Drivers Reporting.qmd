@@ -27,14 +27,21 @@ employment_demographics <- readxl::read_xlsx("inputs/RRX - Employment Demographi
                                              skip = 12) |> 
   janitor::clean_names()
 
+# previous period active employees to match job changes
+previous_demographics <- readxl::read_xlsx("inputs/RRX - Employment Demographics_2024.xlsx", skip = 12) |> 
+  janitor::clean_names() |> 
+  select(sso_number, job_profile, career_level, manager_sso) |> 
+  rename_with(~ paste0(., "_previous"), -sso_number)
+
 # temp time in position
 time_in_position <- readxl::read_xlsx("inputs/temp-time in role.xlsx", skip = 17) |> 
   janitor::clean_names() |> 
-  select(employee_id, time_in_job_profile_start_date)
+  select(employee_id, time_in_job_profile_start_date) 
 
 # add time in position to main file
 df <- employment_demographics |> 
-  left_join(time_in_position, by = c("sso_number" = "employee_id"))
+  left_join(time_in_position, by = c("sso_number" = "employee_id")) |> 
+  left_join(previous_demographics, by = "sso_number")
 
 # all job changes to compare
 job_changes <- readxl::read_xlsx("inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes.xlsx", skip = 7) |> 
@@ -57,6 +64,20 @@ df <- df |>
   ))
 ```
 
+- Add column to identify changes from previous period file
+
+```{r}
+df <- df |> 
+  mutate(worker_change = case_when(
+    job_profile != job_profile_previous ~ TRUE,
+    career_level != career_level_previous ~ TRUE,
+    manager_sso != manager_sso_previous ~ TRUE,
+    TRUE ~ FALSE
+  )) |> 
+  filter(worker_change == "TRUE")
+```
+
+
 - Filter on [Time in Job Profile Start Date]
   - (1/1/{yyyy}) < [Time in Job Profile Start Date] < Last day in period
   - Feb update example: 1/1/2025 < [Time in Job Profile Start Date] < 1/31/2025
@@ -72,6 +93,37 @@ df <- df |>
 ```{r}
 df_manager <- df |> 
   filter(!career_level %in% c("AT1", "AT2", "AT3", "M1") & !is.na(career_level))
+```
+
+Data Integrity
+
+- Compare against worker data 
+
+```{r}
+job_changes_manager <- job_changes |> 
+  filter(!new_career_level %in% c("AT1", "AT2", "AT3", "M1") & !is.na(new_career_level))
+```
+
+```{r}
+diff_df_manager <- df_manager |> 
+  anti_join(job_changes_manager, by = c("sso_number" = "employee_id"))
+```
+
+```{r}
+diff_job_changes_manager <- job_changes_manager |> 
+  anti_join(df_manager, by = c("employee_id" = "sso_number"))
+```
+
+- Explore differences
+
+```{r}
+writexl::write_xlsx(
+  list(
+    diff_df_manager = diff_df_manager,
+    diff_job_changes_manager = diff_job_changes_manager
+  ),
+  path = "data_discrepancies.xlsx"
+)
 ```
 
   
