@@ -1,0 +1,104 @@
+---
+title: "Internal Fill Rate"
+format: html
+editor: visual
+---
+
+### Load data sources
+
+-   People Analytics - Active and Terminated Report (PA - AT Report)
+
+-   RRX\_-\_Worker_Data\_-\_Hires_and_Job_Changes Report (Movement Report)
+
+-   Define period:
+
+    -   Start date: 2025-01-01
+
+    -   End date: last date of previous month
+
+```{r}
+library(tidyverse)
+
+# specify period
+start_date <- as.Date("2025-01-01")
+end_date <- Sys.Date()
+# end_date <- floor_date(Sys.Date(), "month") - days(1)
+
+pa_at <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 1) |> 
+  janitor::clean_names()
+```
+
+### Definitions
+
+-   internal_external:
+
+    -   External: hire date is the same as job profile start date
+
+    -   Internal: job profile start date is after hire rate
+
+### Filter
+
+-   Period: Job profile start date is within the period of interest
+
+-   Manager+: remove career levels starting with "AT", "M1", and blanks
+
+```{r}
+df <- pa_at |> 
+  mutate(internal_external = case_when(
+    hire_date == time_in_job_profile_start_date ~ "External",
+    hire_date < time_in_job_profile_start_date ~ "Internal",
+    TRUE ~ "Error")
+    ) |>
+  filter(time_in_job_profile_start_date >= start_date &
+           time_in_job_profile_start_date <= end_date)
+
+df_manager <- df |> 
+  filter(!career_level %in% c("AT1", "AT2", "AT3", "AT4", "M1") & 
+           !is.na(career_level))
+
+df_manager |> 
+  group_by(internal_external) |> 
+  summarize(count = n()) |> 
+  mutate(total = sum(count),
+         fill_rate = round(count / total, 2))
+```
+
+### Add additional context from movement report
+
+-   Remove duplicate rows for promotions (remove business process type outbound)
+
+-   Remove moves to another manager
+
+```{r}
+# compare to data changes 
+hires_changes <- readxl::read_xlsx("inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes.xlsx", skip = 7) |> 
+  janitor::clean_names() |> 
+  filter(business_process_type != "Promote Employee Outbound",
+         business_process_reason != "Transfer > Transfer > Move to another Manager")
+
+full_df <- df_manager |> 
+  left_join(hires_changes, by = "employee_id")
+
+full_df |> 
+  group_by(internal_external) |> 
+  summarize(n = n()) |> 
+  mutate(total = sum(n),
+         fill_rate = round(n / total, 2))
+```
+
+### Validation Checks
+
+```{r}
+# look at employees on the movement file that aren't showing as a match
+movement_not_match <- hires_changes |> 
+  filter(!new_career_level %in% c("AT1", "AT2", "AT3", "AT4", "M1") & 
+           !is.na(new_career_level)) |> 
+  filter(!str_detect(business_process_reason, "Terminate")) |> 
+  anti_join(df_manager, by = "employee_id")
+
+movement_not_match |> 
+  group_by(business_process_reason) |> 
+  summarize(n = n())
+
+write.csv(movement_not_match, "temp.csv")
+```

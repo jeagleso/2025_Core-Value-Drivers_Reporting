@@ -71,7 +71,7 @@ df <- df |>
   mutate(worker_change = case_when(
     job_profile != job_profile_previous ~ TRUE,
     career_level != career_level_previous ~ TRUE,
-    manager_sso != manager_sso_previous ~ TRUE,
+    # manager_sso != manager_sso_previous ~ TRUE,
     TRUE ~ FALSE
   )) |> 
   filter(worker_change == "TRUE")
