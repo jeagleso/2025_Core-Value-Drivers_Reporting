@@ -25,7 +25,7 @@ end_date <- Sys.Date()
 # end_date <- floor_date(Sys.Date(), "month") - days(1)
 
 pa_at <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 1) |> 
-  janitor::clean_names()
+  janitor::clean_names() 
 ```
 
 ### Definitions
@@ -47,20 +47,19 @@ df <- pa_at |>
   mutate(internal_external = case_when(
     hire_date == time_in_job_profile_start_date ~ "External",
     hire_date < time_in_job_profile_start_date ~ "Internal",
-    TRUE ~ "Error")
-    ) |>
+    TRUE ~ "Error")) |>
+  mutate(career_level_bucket = factor(case_when(
+    career_level %in% c("E2", "E3", "E4") ~ "VP",
+    career_level %in% c("M5", "E1") ~ "Director",
+    career_level %in% c("M2", "M3", "M4") ~ "Manager",
+    career_level == "M1" ~ "Supervisor",
+    career_level %in% c("P1", "P2", "P3", "P4", "P5", "P6") ~ "Professional",
+    career_level %in% c("AT1", "AT2", "AT3", "AT4") ~ "Administrative_Technical",
+    TRUE ~ "Other"),
+    levels = c("VP", "Director", "Manager", "Supervisor", "Professional", "Administrative_Technical", "Other"),
+    ordered = TRUE)) |> 
   filter(time_in_job_profile_start_date >= start_date &
            time_in_job_profile_start_date <= end_date)
-
-df_manager <- df |> 
-  filter(!career_level %in% c("AT1", "AT2", "AT3", "AT4", "M1") & 
-           !is.na(career_level))
-
-df_manager |> 
-  group_by(internal_external) |> 
-  summarize(count = n()) |> 
-  mutate(total = sum(count),
-         fill_rate = round(count / total, 2))
 ```
 
 ### Add additional context from movement report
@@ -70,65 +69,132 @@ df_manager |>
 -   Remove moves to another manager
 
 ```{r}
-# compare to data changes 
-hires_changes <- readxl::read_xlsx("inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes.xlsx", skip = 7) |> 
-  janitor::clean_names() |> 
+# add change details
+hires_changes_raw <- readxl::read_xlsx("inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes.xlsx", skip = 7) |> 
+  janitor::clean_names() 
+  
+hires_changes <- hires_changes_raw |> 
+  select(employee_id, starts_with("prior_"), starts_with("new_"), business_process_type, business_process_reason, effective_date) |> 
   filter(business_process_type != "Promote Employee Outbound",
          business_process_reason != "Transfer > Transfer > Move to another Manager")
 
-full_df <- df_manager |> 
+full_df <- df |> 
   left_join(hires_changes, by = "employee_id")
 
-full_df |> 
-  group_by(internal_external) |> 
-  summarize(n = n()) |> 
-  mutate(total = sum(n),
-         fill_rate = round(n / total, 2))
+full_df_manager <- full_df |> 
+  filter(!career_level %in% c("AT1", "AT2", "AT3", "AT4", 
+                              "P1", "P2", "P3", "M1") & 
+           !is.na(career_level))
 ```
 
-### Validation Checks
+Many-to-many relationship being caused by "610172396" who was hired and then termed a week later
 
 ```{r}
-# look at employees on the movement file that aren't showing as a match
-movement_not_match <- hires_changes |> 
-  filter(!new_career_level %in% c("AT1", "AT2", "AT3", "AT4", "M1") & 
-           !is.na(new_career_level)) |> 
-  filter(!str_detect(business_process_reason, "Terminate")) |> 
-  anti_join(df_manager, by = "employee_id")
+hires_changes |> 
+  group_by(employee_id) |> 
+  filter(n() > 1) |> 
+  ungroup() |> 
+  select(employee_id, business_process_reason, effective_date)
+```
 
-movement_not_match |> 
-  group_by(business_process_reason) |> 
-  summarize(n = n())
+### Hiring all levels
 
-write.csv(movement_not_match, "temp.csv")
+```{r}
+full_df |> 
+  group_by(career_level_bucket, internal_external) |> 
+  summarize(count = n()) |> 
+  mutate(total = sum(count),
+         fill_rate = round(count / total, 2)) |> 
+  filter(internal_external == "Internal")
+```
+
+```{r}
+output_enterprise <- full_df_manager |> 
+  group_by(internal_external) |> 
+  summarize(count = n()) |> 
+  mutate(total = sum(count),
+         fill_rate = round(count / total, 2))
+
+output_enterprise
 ```
 
 ### Create Function
 
 ```{r}
-df <- pa_at |> 
-  mutate(internal_external = case_when(
-    hire_date == time_in_job_profile_start_date ~ "External",
-    hire_date < time_in_job_profile_start_date ~ "Internal",
-    TRUE ~ "Error")
-    ) |>
-  filter(time_in_job_profile_start_date >= start_date &
-           time_in_job_profile_start_date <= end_date)
-
-df_manager <- df |> 
-  filter(!career_level %in% c("AT1", "AT2", "AT3", "AT4", "M1") & 
-           !is.na(career_level))
-
-# NOT WORKING AS EXPECTED 
-calculate_internal_fill_segment <- function(df, grouping_var) {
+calculate_internal_fill <- function(df, grouping_var) {
   df <- df |> 
     group_by(across(all_of(grouping_var)), internal_external) |> 
-    summarize(count = n(), .groups = "drop") |> 
+    summarize(count = n(), .groups = "drop_last") |> 
+    group_by(across(all_of(grouping_var))) |> 
+    complete(internal_external = c("Internal", "External"), 
+             fill = list(count = 0)) |>  
     mutate(total = sum(count),
-           fill_rate = round(count / total, 2))
+           fill_rate = round(count / total, 2)) |> 
+    ungroup() |> 
+    filter(internal_external == "Internal") |> 
+    arrange(desc(total))
   return(df)
 }
+```
 
-calculate_internal_fill_segment(df = df_manager,
+```{r}
+# calculate by segment_function
+output_segment <- calculate_internal_fill(df = full_df_manager,
                                 "segment_function")
+
+output_segment
+```
+
+```{r}
+# Calculate internal fill rate by segment_function and location
+output_segment_location <- calculate_internal_fill(df = full_df_manager,
+                                                   grouping_var = c("segment_function", "location"))
+```
+
+```{r}
+output_segment_level <- calculate_internal_fill(df = full_df_manager, 
+                                                grouping_var = c("segment_function", "career_level_bucket"))
+
+output_segment_level
+```
+
+### Remove confidential data to share raw 
+
+```{r}
+full_df_manager_share <- full_df_manager |> 
+  select(-starts_with("x9box"), -gender, -race_ethnicity, -age, -age_group, -continuous_service_date, -original_hire_date) |> 
+  mutate_at(vars(contains("date")), as.Date)
+```
+
+### Create output file
+
+```{r}
+# include all dfs to be included in xlsx
+output_list <- list(
+  enterprise = output_enterprise,
+  by_segment = output_segment,
+  by_segment_level = output_segment_level,
+  by_segment_location = output_segment_location,
+  all_data = full_df_manager_share
+)
+
+# write to xlsx
+writexl::write_xlsx(output_list, path = "outputs/internal_fill_test.xlsx")
+```
+
+### Validation Checks
+
+```{r}
+# on job changes, not diff profile/hire date
+# excluding terminations and outbound to remove duplicates 
+qa_change_dates_same <- hires_changes_raw |> 
+  filter(business_process_type != "Promote Employee Outbound") |> 
+  filter(!new_career_level %in% c("AT1", "AT2", "AT3", "AT4", 
+                                  "P1", "P2", "P3", "M1") & 
+           !is.na(new_career_level) & !str_detect(business_process_reason, "Terminate")) |> 
+  anti_join(df, by = "employee_id")
+
+qa_change_dates_same |> 
+  group_by(business_process_reason) |> 
+  summarize(count = n())
 ```
