@@ -102,3 +102,33 @@ movement_not_match |>
 
 write.csv(movement_not_match, "temp.csv")
 ```
+
+### Create Function
+
+```{r}
+df <- pa_at |> 
+  mutate(internal_external = case_when(
+    hire_date == time_in_job_profile_start_date ~ "External",
+    hire_date < time_in_job_profile_start_date ~ "Internal",
+    TRUE ~ "Error")
+    ) |>
+  filter(time_in_job_profile_start_date >= start_date &
+           time_in_job_profile_start_date <= end_date)
+
+df_manager <- df |> 
+  filter(!career_level %in% c("AT1", "AT2", "AT3", "AT4", "M1") & 
+           !is.na(career_level))
+
+# NOT WORKING AS EXPECTED 
+calculate_internal_fill_segment <- function(df, grouping_var) {
+  df <- df |> 
+    group_by(across(all_of(grouping_var)), internal_external) |> 
+    summarize(count = n(), .groups = "drop") |> 
+    mutate(total = sum(count),
+           fill_rate = round(count / total, 2))
+  return(df)
+}
+
+calculate_internal_fill_segment(df = df_manager,
+                                "segment_function")
+```
