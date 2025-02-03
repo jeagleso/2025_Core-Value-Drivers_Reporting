@@ -1,0 +1,78 @@
+---
+title: "Voluntary Turnover"
+format: html
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| warning: false
+library(tidyverse)
+
+directory_active <- "C:/Users/610171734/OneDrive - Regal Rexnord/Documents/2024/2024_Core Value Drivers_Reporting/inputs/2024_HC"
+
+directory_terms <- "C:/Users/610171734/OneDrive - Regal Rexnord/Documents/2024/2024_Core Value Drivers_Reporting/inputs/2024_Terms"
+
+read_and_combine <- function(directory_path, row_skip) {
+  files <- list.files(directory_path, full.names = TRUE, pattern = "*.xlsx")
+  data_list <- lapply(files, function(file) {
+    data <- readxl::read_xlsx(file, sheet = "Raw Data", skip = row_skip) |> 
+      janitor::clean_names()
+    data <- data |> 
+      mutate(source_file = basename(file)) |> 
+      mutate(effective_date = str_extract(source_file, 
+                                          "(?<=2024 ).*(?=\\.xlsx)") |> ymd())
+    return(data)
+  })
+  combined_data <- bind_rows(data_list)
+  return(combined_data)
+}
+
+headcount_data <- read_and_combine(directory_path = directory_active, 
+                                   row_skip = 17)
+
+termination_data <- read_and_combine(directory_path = directory_terms, 
+                                     row_skip = 12)
+```
+
+```{r}
+#| label: calculate_turnover_monthly_files
+
+monthly_turnover_rate_monthly_files <- termination_data |> 
+  group_by(month = floor_date(termination_date, "month")) |> 
+  summarize(terminations = n()) |> 
+  left_join(
+    headcount_data |> 
+      group_by(month = floor_date(effective_date, "month")) |> 
+      summarize(headcount = n()), by = "month") |> 
+  mutate(turnover_rate = (terminations / headcount) * 100)
+  )
+
+```
+
+```{r}
+#| label: calculate_turnover_at_file
+
+active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip =1) |> 
+  janitor::clean_names() 
+
+active_and_terminated_employees <- active_and_terminated |> 
+  filter(worker_type == "Employee")
+
+months_included <- seq(as.Date("2024-01-01"), as.Date("2024-12-31"), by = "month")
+
+# data frame with all months
+monthly_data <- tibble(month = months_included)
+
+monthly_turnover_rate_at_file <- monthly_data |>
+  rowwise() |> 
+  mutate(
+    headcount = sum(active_and_terminated_employees$hire_date <= month & 
+                      (is.na(active_and_terminated_employees$termination_date) |
+                         active_and_terminated_employees$termination_date >= month)),
+    terminations = sum(!is.na(active_and_terminated_employees$termination_date) & 
+                       active_and_terminated_employees$termination_date >= month & 
+                       active_and_terminated_employees$termination_date < month + months(1))) |> 
+  ungroup() |> 
+  mutate(turnover_rate = terminations / headcount)
+```
