@@ -26,13 +26,14 @@ start_date <- floor_date(Sys.Date(), "year")
 end_date <- floor_date(Sys.Date(), "month") - days(1)
 
 # define filters to get target population
-# profile start date in period
 # manager+
+# employees only no contingent
 apply_filters <- function(df) {
   df |> 
     filter(!career_level %in% c("AT1", "AT2", "AT3", "AT4", 
                               "P1", "P2", "P3", "M1") & 
-           !is.na(career_level))
+           !is.na(career_level)) |> 
+    filter(worker_type == "Employee")
 }
 
 # set the grouping variables of interest
@@ -65,7 +66,7 @@ file_path_pa_at <- "inputs/People Analytics - AT.xlsx"
 
 # add career_level and internal/external flag
 df_pa_at <- readxl::read_xlsx(file_path_pa_at, skip = 1) |> 
-    janitor::clean_names() |> 
+    janitor::clean_names() |>
   mutate(career_level_bucket = factor(case_when(
     career_level %in% c("E2", "E3", "E4", "E5") ~ "VP",
     career_level %in% c("M5", "E1") ~ "Director",
@@ -96,14 +97,14 @@ pa_at <- df_pa_at |>
 file_path_worker_changes <- "inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes.xlsx"
 
 # read in worker changes
-df_worker_changes <- readxl::read_xlsx(file_path_worker_changes, skip = 7) |> 
-  janitor::clean_names()
+df_worker_changes_raw <- readxl::read_xlsx(file_path_worker_changes, skip = 7) |> 
+  janitor::clean_names() 
 
-worker_changes <- df_worker_changes |> 
-  select(employee_id, effective_date, business_process_type, business_process_reason, starts_with("prior_"), starts_with("new_")) |>
-  filter(business_process_type != "Promote Employee Outbound",
-         business_process_type != "Termination",
-         business_process_reason != "Transfer > Transfer > Move to another Manager") 
+df_worker_changes <- df_worker_changes_raw |> 
+  select(employee_id, effective_date, business_process_type, business_process_reason, starts_with("prior_"), starts_with("new_")) 
+
+worker_changes <- df_worker_changes |>
+  filter(business_process_type != "Promote Employee Outbound") 
 ```
 
 
@@ -111,19 +112,37 @@ worker_changes <- df_worker_changes |>
 ```{r}
 #| label: join_data
 
-# join data together
+# join data together matching on employee id and effective date/job profile start date
 # apply filters to get target population
 full_df <- pa_at |> 
-  left_join(worker_changes, by = "employee_id") |> 
+  left_join(worker_changes, by = join_by("employee_id", "time_in_job_profile_start_date" == "effective_date")) |> 
   apply_filters()
 
-#validation: check if many-to-many caused from multiple moves
+# validation: check if many-to-many caused from multiple moves
 qa_multiple_moves <- full_df %>%
   group_by(employee_id) %>%
   filter(n() > 1) %>%
   ungroup()
 ```
 
+
+
+```{r}
+#| label: data_to_share
+
+# all data to be shared with results
+full_df_scrubbed <- full_df |> 
+  mutate(effective_date = case_when(
+    is.na(business_process_reason) ~ NA,
+    TRUE ~ time_in_job_profile_start_date)) |> 
+  select(employee_id, worker, hire_date, time_in_job_profile_start_date, internal_external, 
+         segment_function, division_function, location, career_level, 
+         effective_date, business_process_type, business_process_reason, 
+         prior_job_profile, prior_career_level, prior_comp_grade, 
+         new_job_profile, new_career_level, new_comp_grade) |> 
+  mutate_at(vars(contains("date")), as.Date) |> 
+  arrange(time_in_job_profile_start_date)
+```
 
 
 ```{r}
@@ -147,6 +166,10 @@ calculate_internal_fill <- function(df = full_df, grouping_var) {
            'Internal Fill Rate' = fill_rate)
   return(df)
 }
+```
+
+```{r}
+#| label: get_output
 
 # run IFR function for each grouping variable
 results <- map(grouping_vars, ~ calculate_internal_fill(full_df, .x))
@@ -154,13 +177,26 @@ results <- map(grouping_vars, ~ calculate_internal_fill(full_df, .x))
 # name each grouping var output to its sheet name
 results_named <- set_names(results, output_sheet_names)
 
-# name the output excel file
-output_name <- paste0("outputs/Internal Fill Rate", start_date, "-", end_date, ".xlsx")
+# add the scrubbed data details 
+results_named[["Data Details"]] <- full_df_scrubbed
 
-# write output to excel file
-writexl::write_xlsx(results_named, output_name)
+# name the output excel file
+output_name <- paste0("outputs/Internal Fill Rate ", start_date, " to ", end_date, ".xlsx")
 ```
 
+```{r}
+# try with openxlsx
+library(openxlsx)
+
+wb <- createWorkbook()
+
+for (sheet_name in names(results_named)) {
+  addWorksheet(wb, sheet_name)
+  writeDataTable(wb, sheet = sheet_name, x = results_named[[sheet_name]], tableStyle = "TableStyleMedium2")
+}
+
+saveWorkbook(wb, output_name, overwrite = TRUE)
+```
 
 
 ### Definitions
