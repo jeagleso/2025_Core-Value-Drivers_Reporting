@@ -43,8 +43,8 @@ library(tidyverse)
 #| label: set_up
 
 # specify period: first date of current year and last day of previous month
-start_date <- floor_date(Sys.Date(), "year")
-end_date <- floor_date(Sys.Date(), "month") - days(1)
+start_date <- "2024-01-01"
+end_date <- "2024-12-31"
 
 # define filters to get target population
 # manager+
@@ -83,7 +83,7 @@ if (length(grouping_vars) != length(output_sheet_names)) {
 #| label: pa_at
 
 # file path for latest active and terminated
-file_path_pa_at <- "inputs/People Analytics - AT.xlsx"
+file_path_pa_at <- "inputs/People Analytics - AT 2024.xlsx"
 
 # add career_level and internal/external flag
 df_pa_at <- readxl::read_xlsx(file_path_pa_at, skip = 1) |> 
@@ -115,7 +115,7 @@ pa_at <- df_pa_at |>
 #| label: worker_changes
 
 # file path to most recent changes report
-file_path_worker_changes <- "inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes.xlsx"
+file_path_worker_changes <- "inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes 2024.xlsx"
 
 # read in worker changes
 df_worker_changes_raw <- readxl::read_xlsx(file_path_worker_changes, skip = 7) |> 
@@ -229,12 +229,13 @@ saveWorkbook(wb, output_name, overwrite = TRUE)
 ```{r}
 # on job changes, not diff profile/hire date
 # excluding terminations and outbound to remove duplicates 
-qa_change_dates_same <- hires_changes_raw |> 
+qa_change_dates_same <- df_worker_changes |> 
   filter(business_process_type != "Promote Employee Outbound") |> 
   filter(!new_career_level %in% c("AT1", "AT2", "AT3", "AT4", 
                                   "P1", "P2", "P3", "M1") & 
-           !is.na(new_career_level) & !str_detect(business_process_reason, "Terminate")) |> 
-  anti_join(df, by = "employee_id")
+           !is.na(new_career_level)) |> 
+  filter(!str_detect(business_process_reason, "Terminate")) |> 
+  anti_join(pa_at, by = "employee_id")
 
 qa_change_dates_same |> 
   group_by(business_process_reason) |> 
