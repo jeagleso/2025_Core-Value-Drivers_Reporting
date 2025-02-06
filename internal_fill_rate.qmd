@@ -12,21 +12,156 @@ editor: visual
 
 -   Define period:
 
-    -   Start date: 2025-01-01
+    -   Start date: First date of current year
 
-    -   End date: last date of previous month
+    -   End date: Last date of previous month
 
 ```{r}
 library(tidyverse)
 
-# specify period
-start_date <- as.Date("2025-01-01")
-end_date <- Sys.Date()
-# end_date <- floor_date(Sys.Date(), "month") - days(1)
+#| label: set_up
 
-pa_at <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 1) |> 
-  janitor::clean_names() 
+# specify period: first date of current year and last day of previous month
+start_date <- floor_date(Sys.Date(), "year")
+end_date <- floor_date(Sys.Date(), "month") - days(1)
+
+# define filters to get target population
+# profile start date in period
+# manager+
+apply_filters <- function(df) {
+  df |> 
+    filter(!career_level %in% c("AT1", "AT2", "AT3", "AT4", 
+                              "P1", "P2", "P3", "M1") & 
+           !is.na(career_level))
+}
+
+# set the grouping variables of interest
+grouping_vars <- list(NULL, 
+                      "segment_function", 
+                      c("segment_function", "division_function"), 
+                      c("segment_function", "division_function", "location"),
+                      c("segment_function", "career_level_bucket"))
+
+# set name for output sheet name for each grouping variable
+output_sheet_names <- c("Overall",
+                        "Segment",
+                        "Segment by Division",
+                        "Division by Location",
+                        "Segment by Level")
+
+# check if the number of grouping variables matches the number of sheet names
+if (length(grouping_vars) != length(output_sheet_names)) {
+  stop("The number of grouping variables and sheet names must be the same.")
+}
 ```
+
+
+
+```{r}
+#| label: pa_at
+
+# file path for latest active and terminated
+file_path_pa_at <- "inputs/People Analytics - AT.xlsx"
+
+# add career_level and internal/external flag
+df_pa_at <- readxl::read_xlsx(file_path_pa_at, skip = 1) |> 
+    janitor::clean_names() |> 
+  mutate(career_level_bucket = factor(case_when(
+    career_level %in% c("E2", "E3", "E4", "E5") ~ "VP",
+    career_level %in% c("M5", "E1") ~ "Director",
+    career_level %in% c("M2", "M3", "M4") ~ "Manager",
+    career_level == "M1" ~ "Supervisor",
+    career_level %in% c("P1", "P2", "P3", "P4", "P5", "P6") ~ "Professional",
+    career_level %in% c("AT1", "AT2", "AT3", "AT4") ~ "Administrative_Technical",
+    is.na(career_level) ~ "None",
+    TRUE ~ "ERROR_unmapped_level"),
+    levels = c("VP", "Director", "Manager", "Supervisor", "Professional", "Administrative_Technical", "None", "ERROR_unmapped_level"),
+    ordered = TRUE)) |>
+  mutate(internal_external = case_when(
+    hire_date == time_in_job_profile_start_date ~ "External",
+    hire_date < time_in_job_profile_start_date ~ "Internal",
+    TRUE ~ "Error"))
+
+# filter data to current period
+# add project filters to get target population
+pa_at <- df_pa_at |> 
+    filter(time_in_job_profile_start_date >= start_date &
+           time_in_job_profile_start_date <= end_date)
+```
+
+```{r}
+#| label: worker_changes
+
+# file path to most recent changes report
+file_path_worker_changes <- "inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes.xlsx"
+
+# read in worker changes
+df_worker_changes <- readxl::read_xlsx(file_path_worker_changes, skip = 7) |> 
+  janitor::clean_names()
+
+worker_changes <- df_worker_changes |> 
+  select(employee_id, effective_date, business_process_type, business_process_reason, starts_with("prior_"), starts_with("new_")) |>
+  filter(business_process_type != "Promote Employee Outbound",
+         business_process_type != "Termination",
+         business_process_reason != "Transfer > Transfer > Move to another Manager") 
+```
+
+
+
+```{r}
+#| label: join_data
+
+# join data together
+# apply filters to get target population
+full_df <- pa_at |> 
+  left_join(worker_changes, by = "employee_id") |> 
+  apply_filters()
+
+#validation: check if many-to-many caused from multiple moves
+qa_multiple_moves <- full_df %>%
+  group_by(employee_id) %>%
+  filter(n() > 1) %>%
+  ungroup()
+```
+
+
+
+```{r}
+#| label: function_calculate_internal_fill
+
+calculate_internal_fill <- function(df = full_df, grouping_var) {
+  df <- df |> 
+    group_by(across(all_of(grouping_var)), internal_external) |> 
+    summarize(count = n(), .groups = "drop_last") |> 
+    group_by(across(all_of(grouping_var))) |> 
+    complete(internal_external = c("Internal", "External"), 
+             fill = list(count = 0)) |>  
+    mutate(total = sum(count),
+           fill_rate = round(count / total, 2)) |> 
+    ungroup() |> 
+    filter(internal_external == "Internal") |> 
+    arrange(desc(total)) |> 
+    select(-internal_external) |> 
+    rename('Roles Filled Internally' = count,
+           'Total Filled Roles' = total,
+           'Internal Fill Rate' = fill_rate)
+  return(df)
+}
+
+# run IFR function for each grouping variable
+results <- map(grouping_vars, ~ calculate_internal_fill(full_df, .x))
+
+# name each grouping var output to its sheet name
+results_named <- set_names(results, output_sheet_names)
+
+# name the output excel file
+output_name <- paste0("outputs/Internal Fill Rate", start_date, "-", end_date, ".xlsx")
+
+# write output to excel file
+writexl::write_xlsx(results_named, output_name)
+```
+
+
 
 ### Definitions
 
@@ -64,7 +199,7 @@ df <- pa_at |>
 
 ### Add additional context from movement report
 
--   Remove duplicate rows for promotions (remove business process type outbound)
+-   Remove duplicate rows for promotions (remove business process type promote employee outbound)
 
 -   Remove moves to another manager
 
@@ -158,7 +293,7 @@ output_segment_level <- calculate_internal_fill(df = full_df_manager,
 output_segment_level
 ```
 
-### Remove confidential data to share raw 
+### Remove confidential data to share raw
 
 ```{r}
 full_df_manager_share <- full_df_manager |> 
