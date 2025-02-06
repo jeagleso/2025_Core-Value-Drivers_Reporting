@@ -122,6 +122,9 @@ df_worker_changes_raw <- readxl::read_xlsx(file_path_worker_changes, skip = 7) |
   janitor::clean_names() 
 
 df_worker_changes <- df_worker_changes_raw |> 
+  group_by(employee_id, effective_date) |> 
+  filter(!(n() > 1 & business_process_reason == "Transfer > Transfer > Move to another Manager")) |> 
+  ungroup() |> 
   select(employee_id, effective_date, business_process_type, business_process_reason, starts_with("prior_"), starts_with("new_")) 
 
 worker_changes <- df_worker_changes |>
@@ -144,6 +147,11 @@ qa_multiple_moves <- full_df %>%
   group_by(employee_id) %>%
   filter(n() > 1) %>%
   ungroup()
+
+# check if the number of grouping variables matches the number of sheet names
+if (nrow(qa_multiple_moves) > 0) {
+  stop("At least one person has multiple moves on same effective date.")
+}
 ```
 
 
@@ -229,14 +237,33 @@ saveWorkbook(wb, output_name, overwrite = TRUE)
 ```{r}
 # on job changes, not diff profile/hire date
 # excluding terminations and outbound to remove duplicates 
-qa_change_dates_same <- hires_changes_raw |> 
+qa_change_dates_same <- df_worker_changes_raw |> 
   filter(business_process_type != "Promote Employee Outbound") |> 
   filter(!new_career_level %in% c("AT1", "AT2", "AT3", "AT4", 
                                   "P1", "P2", "P3", "M1") & 
-           !is.na(new_career_level) & !str_detect(business_process_reason, "Terminate")) |> 
-  anti_join(df, by = "employee_id")
+           !is.na(new_career_level)) |> 
+  filter(!str_detect(business_process_reason, "Terminate")) |> 
+  anti_join(pa_at, by = "employee_id") |> 
+  select(employee_id, worker, 
+         segment_function, division_function,
+         effective_date, business_process_type, business_process_reason, 
+         prior_job_profile, prior_career_level, prior_comp_grade, 
+         new_job_profile, new_career_level, new_comp_grade)
 
 qa_change_dates_same |> 
   group_by(business_process_reason) |> 
   summarize(count = n())
 ```
+```{r}
+writexl::write_xlsx(
+  list(
+    "New Profile No Move" = full_df_scrubbed |> 
+         filter(is.na(effective_date)),
+    "Promo or Lateral No New Profile" = qa_change_dates_same |> 
+         filter(str_detect(business_process_reason, "Promotion") | 
+                             str_detect(business_process_reason, "lateral"))
+    ), 
+  "outputs/Internal Fill Data Validation.xlsx"
+)
+```
+
