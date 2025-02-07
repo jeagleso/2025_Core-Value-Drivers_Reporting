@@ -258,8 +258,7 @@ saveWorkbook(wb, output_name, overwrite = TRUE)
 # excluding terminations and outbound to remove duplicates 
 qa_change_dates_same <- df_worker_changes_raw |> 
   filter(business_process_type != "Promote Employee Outbound") |> 
-  filter(!new_career_level %in% c("AT1", "AT2", "AT3", "AT4", 
-                                  "P1", "P2", "P3", "M1") & 
+  filter(!str_detect(new_career_level, "AT") & !str_detect(new_career_level, "P") & 
            !is.na(new_career_level)) |> 
   filter(!str_detect(business_process_reason, "Terminate")) |> 
   anti_join(pa_at, by = "employee_id") |> 
