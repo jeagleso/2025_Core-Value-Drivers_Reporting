@@ -29,7 +29,7 @@ editor: visual
 
 -   Period: Job profile start date is within the period of interest
 
--   Manager+: remove career levels starting with "AT", "P", "M1", and blanks
+-   Manager+: remove career levels starting with "AT", "P", and blanks
 
 -   Employee only: contingent workers are removed
 
@@ -55,8 +55,7 @@ end_date <- floor_date(Sys.Date(), "month") - days(1)
 # employees only no contingent
 apply_filters <- function(df) {
   df |> 
-    filter(!career_level %in% c("AT1", "AT2", "AT3", "AT4", 
-                              "P1", "P2", "P3", "M1") & 
+    filter(!str_detect(career_level, "AT") & !str_detect(career_level, "P") & 
            !is.na(career_level)) |> 
     filter(worker_type == "Employee") |> 
     filter(job_family_group != "Human Resources")
