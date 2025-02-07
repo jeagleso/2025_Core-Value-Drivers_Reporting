@@ -8,7 +8,7 @@ editor: visual
 
 -   People Analytics - Active and Terminated Report (PA - AT Report)
 
--   RRX\_-\_Worker_Data\_-\_Hires_and_Job_Changes Report (Movement Report)
+-   RRX\_-\_Worker_Data\_-\_Hires_and_Job_Changes Report (Worker Changes Report)
 
     
 ### Definitions
@@ -19,7 +19,7 @@ editor: visual
 
     -   End date: Last date of previous month
     
-- internal_external:
+- Internal vs. External:
 
     -   External: hire date is the same as job profile start date
 
@@ -31,11 +31,15 @@ editor: visual
 
 -   Manager+: remove career levels starting with "AT", "P", "M1", and blanks
 
-### Add additional context from movement report
+-   Employee only: contingent workers are removed
+
+-   No HR: job family group Human Resources is removed
+
+### Add additional context from worker changes report
 
 -   Remove duplicate rows for promotions (remove business process type promote employee outbound)
 
--   Matches when profile start date and effective date are the same
+-   Pulls in when job profile start date and effective date on worker changes report are the same
 
 ```{r}
 library(tidyverse)
@@ -54,7 +58,8 @@ apply_filters <- function(df) {
     filter(!career_level %in% c("AT1", "AT2", "AT3", "AT4", 
                               "P1", "P2", "P3", "M1") & 
            !is.na(career_level)) |> 
-    filter(worker_type == "Employee")
+    filter(worker_type == "Employee") |> 
+    filter(job_family_group != "Human Resources")
 }
 
 # set the grouping variables of interest
@@ -121,11 +126,13 @@ file_path_worker_changes <- "inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes.xl
 df_worker_changes_raw <- readxl::read_xlsx(file_path_worker_changes, skip = 7) |> 
   janitor::clean_names() 
 
+# if an employee has more than one business process reason on an effective date, remove transfer to another manager
 df_worker_changes <- df_worker_changes_raw |> 
   group_by(employee_id, effective_date) |> 
   filter(!(n() > 1 & business_process_reason == "Transfer > Transfer > Move to another Manager")) |> 
   ungroup() |> 
-  select(employee_id, effective_date, business_process_type, business_process_reason, starts_with("prior_"), starts_with("new_")) 
+  select(employee_id, effective_date, business_process_type, business_process_reason, 
+         starts_with("prior_"), starts_with("new_")) 
 
 worker_changes <- df_worker_changes |>
   filter(business_process_type != "Promote Employee Outbound") 
@@ -139,7 +146,8 @@ worker_changes <- df_worker_changes |>
 # join data together matching on employee id and effective date/job profile start date
 # apply filters to get target population
 full_df <- pa_at |> 
-  left_join(worker_changes, by = join_by("employee_id", "time_in_job_profile_start_date" == "effective_date")) |> 
+  left_join(worker_changes, by = join_by("employee_id", 
+                                         "time_in_job_profile_start_date" == "effective_date")) |> 
   apply_filters()
 
 # validation: check if many-to-many caused from multiple moves
@@ -185,7 +193,7 @@ calculate_internal_fill <- function(df = full_df, grouping_var) {
     complete(internal_external = c("Internal", "External"), 
              fill = list(count = 0)) |>  
     mutate(total = sum(count),
-           fill_rate = round(count / total, 2)) |> 
+           fill_rate = round(count / total, 4)) |> 
     ungroup() |> 
     filter(internal_external == "Internal") |> 
     arrange(desc(total)) |> 
@@ -226,6 +234,18 @@ wb <- createWorkbook()
 for (sheet_name in names(results_named)) {
   addWorksheet(wb, sheet_name)
   writeDataTable(wb, sheet = sheet_name, x = results_named[[sheet_name]], tableStyle = "TableStyleMedium2")
+  
+  # Get the column index for "Internal Fill Rate"
+  internal_fill_rate_col <- which(names(results_named[[sheet_name]]) == "Internal Fill Rate")
+  
+  # Apply percentage format to the "Internal Fill Rate" column
+  if (length(internal_fill_rate_col) > 0) {
+    addStyle(wb, sheet = sheet_name, 
+             style = createStyle(numFmt = "0%"), 
+             cols = internal_fill_rate_col, 
+             rows = 2:(nrow(results_named[[sheet_name]]) + 1), 
+             gridExpand = TRUE)
+  }
 }
 
 saveWorkbook(wb, output_name, overwrite = TRUE)
@@ -254,14 +274,17 @@ qa_change_dates_same |>
   group_by(business_process_reason) |> 
   summarize(count = n())
 ```
+
+
 ```{r}
+# create data validation file
 writexl::write_xlsx(
   list(
     "New Profile No Move" = full_df_scrubbed |> 
          filter(is.na(effective_date)),
     "Promo or Lateral No New Profile" = qa_change_dates_same |> 
          filter(str_detect(business_process_reason, "Promotion") | 
-                             str_detect(business_process_reason, "lateral"))
+                             str_detect(business_process_reason, "Lateral"))
     ), 
   "outputs/Internal Fill Data Validation.xlsx"
 )
