@@ -29,7 +29,7 @@ editor: visual
 
 -   Period: Job profile start date is within the period of interest
 
--   Manager+: remove career levels starting with "AT", "P", and blanks
+-   Supervisor+: remove career levels starting with "AT", "P", and blanks
 
 -   Employee only: contingent workers are removed
 
@@ -51,8 +51,9 @@ start_date <- floor_date(Sys.Date(), "year")
 end_date <- floor_date(Sys.Date(), "month") - days(1)
 
 # define filters to get target population
-# manager+
+# supervisor+
 # employees only no contingent
+# remove HR
 apply_filters <- function(df) {
   df |> 
     filter(!str_detect(career_level, "AT") & !str_detect(career_level, "P") & 
@@ -62,6 +63,7 @@ apply_filters <- function(df) {
 }
 
 # set the grouping variables of interest
+# if changing grouping variables, also add output_sheet_name
 grouping_vars <- list(NULL, 
                       "segment_function", 
                       c("segment_function", "division_function"), 
@@ -86,7 +88,7 @@ if (length(grouping_vars) != length(output_sheet_names)) {
 ```{r}
 #| label: pa_at
 
-# file path for latest active and terminated
+# file path for active and terminated
 file_path_pa_at <- "inputs/People Analytics - AT.xlsx"
 
 # add career_level and internal/external flag
@@ -107,6 +109,11 @@ df_pa_at <- readxl::read_xlsx(file_path_pa_at, skip = 1) |>
     hire_date == time_in_job_profile_start_date ~ "External",
     hire_date < time_in_job_profile_start_date ~ "Internal",
     TRUE ~ "Error"))
+
+# add test if there is an unmapped level
+if (nrow(df_pa_at |> filter(career_level_bucket == "ERROR_unmapped_level"))  > 0) {
+  stop("There are unmapped career levels")
+}
 
 # filter data to current period
 # add project filters to get target population
@@ -133,6 +140,7 @@ df_worker_changes <- df_worker_changes_raw |>
   select(employee_id, effective_date, business_process_type, business_process_reason, 
          starts_with("prior_"), starts_with("new_")) 
 
+# remove duplicate row for promotions - both inbound and outbound
 worker_changes <- df_worker_changes |>
   filter(business_process_type != "Promote Employee Outbound") 
 ```
@@ -184,6 +192,7 @@ full_df_scrubbed <- full_df |>
 ```{r}
 #| label: function_calculate_internal_fill
 
+# create function for internal fill calculation using df and running for each grouping_var
 calculate_internal_fill <- function(df = full_df, grouping_var) {
   df <- df |> 
     group_by(across(all_of(grouping_var)), internal_external) |> 
