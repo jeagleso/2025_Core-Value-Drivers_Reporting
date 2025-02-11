@@ -111,7 +111,9 @@ a_t_aip <- active_and_terminated |>
            x9box_potential != "New to Company") |> 
   filter(management_chain_level_2 == "Jerry Morton")
 
-months_included <- seq(as.Date("2025-01-01"), as.Date("2025-01-31"), by = "month")
+# assumes running YTD through last full month of current year
+months_included <- seq(floor_date(Sys.Date(), "year"), 
+          floor_date(Sys.Date(), "month") - days(1), by = "month")
 
 last_day_of_month <- ceiling_date(months_included, "month") - days(1)
 
@@ -131,3 +133,9 @@ monthly_turnover_rate_at_file <- monthly_data |>
   ungroup() |> 
   mutate(turnover_rate = terminations / headcount)
 ```
+
+### Future Ideas
+
+- Create a function to make an active file and term file for each month from the AT file
+
+- Possible to embed in body of email to flag for HRBP VPs?
