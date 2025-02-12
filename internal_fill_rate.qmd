@@ -60,6 +60,7 @@ apply_filters <- function(df) {
 grouping_vars <- list(NULL, 
                       "segment_function", 
                       c("segment_function", "division_function"), 
+                      c("segment_function", "division_function", "business_unit_sub_function"),
                       c("segment_function", "division_function", "location"),
                       c("segment_function", "career_level_bucket"))
 
@@ -67,6 +68,7 @@ grouping_vars <- list(NULL,
 output_sheet_names <- c("Overall",
                         "Segment",
                         "Segment by Division",
+                        "Division by Subfunction",
                         "Division by Location",
                         "Segment by Level")
 
