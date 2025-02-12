@@ -216,7 +216,30 @@ calculate_internal_fill <- function(df = full_df, grouping_var) {
 }
 ```
 
+```{r}
+#| label: function_calculate_internal_fill_monthly
 
+# create function for internal fill calculation using df and running for each grouping_var by each month
+calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
+  df <- df |> 
+    mutate(month = floor_date(time_in_job_profile_start_date, "month")) |>  # Assuming there's a 'date' column
+    group_by(across(all_of(grouping_var)), month, internal_external) |> 
+    summarize(count = n(), .groups = "drop_last") |> 
+    group_by(across(all_of(grouping_var)), month) |> 
+    complete(internal_external = c("Internal", "External"), 
+             fill = list(count = 0)) |>  
+    mutate(total = sum(count),
+           fill_rate = round(count / total, 4)) |> 
+    ungroup() |> 
+    filter(internal_external == "Internal") |> 
+    arrange(desc(total)) |> 
+    select(-internal_external) |> 
+    rename('Roles Filled Internally' = count,
+           'Total Filled Roles' = total,
+           'Internal Fill Rate' = fill_rate)
+  return(df)
+}
+```
 
 ```{r}
 #| label: get_output
