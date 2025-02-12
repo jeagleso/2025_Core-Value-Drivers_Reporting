@@ -283,6 +283,9 @@ saveWorkbook(wb, output_name, overwrite = TRUE)
 # get the results by segment
 segment_results <- results_named[["Segment"]] 
 
+unique_segments <- unique(segment_results$segment_function) |> 
+  setdiff("Industrial Systems")
+
 # Function to process monthly rate for each segment
 process_segment <- function(segment) {
   segment_results |> 
