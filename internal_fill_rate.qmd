@@ -108,6 +108,7 @@ df_pa_at <- readxl::read_xlsx(file_path_pa_at, skip = 4) |>
 # filter data to current period
 # add project filters to get target population
 pa_at <- df_pa_at |> 
+    mutate(time_in_job_profile_start_date = as.Date(time_in_job_profile_start_date)) |> 
     filter(time_in_job_profile_start_date >= start_date &
            time_in_job_profile_start_date <= end_date)
 ```
