@@ -191,7 +191,6 @@ calculate_internal_fill <- function(df = full_df, grouping_var) {
 ```
 
 
-
 ```{r}
 #| label: get_output
 
@@ -208,7 +207,46 @@ results_named[["Data Details"]] <- full_df_scrubbed
 output_name <- paste0("outputs/Internal Fill Rate ", start_date, " to ", end_date, ".xlsx")
 ```
 
+```{r}
+#| label: function_calculate_internal_fill_monthly
 
+# create function for internal fill calculation using df and running for each grouping_var by each month
+calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
+  tmp <- full_df |> 
+    mutate(month = floor_date(time_in_job_profile_start_date, "month")) |>  # Assuming there's a 'date' column
+    group_by(segment_function, month, internal_external) |> 
+    summarize(count = n(), .groups = "drop_last") |> 
+    group_by(across(all_of(grouping_var)), month) |> 
+    complete(internal_external = c("Internal", "External"), 
+             fill = list(count = 0)) |>  
+    mutate(total = sum(count),
+           fill_rate = round(count / total, 4)) |> 
+    ungroup() |> 
+    filter(internal_external == "Internal") |> 
+    arrange(desc(total)) |> 
+    select(-internal_external) |> 
+    rename('Roles Filled Internally' = count,
+           'Total Filled Roles' = total,
+           'Internal Fill Rate' = fill_rate)
+  return(df)
+}
+```
+
+```{r}
+#| label: get_output
+
+# run IFR function for each grouping variable
+results <- map(grouping_vars, ~ calculate_internal_fill_monthly(full_df, .x))
+
+# name each grouping var output to its sheet name
+results_named <- set_names(results, output_sheet_names)
+
+# add the scrubbed data details 
+results_named[["Data Details"]] <- full_df_scrubbed
+
+# name the output excel file
+output_name <- paste0("outputs/Internal Fill Rate Monthly", start_date, " to ", end_date, ".xlsx")
+```
 
 ```{r}
 # use openxlsx to format output as tables within excel
