@@ -277,6 +277,28 @@ for (sheet_name in names(results_named)) {
 saveWorkbook(wb, output_name, overwrite = TRUE)
 ```
 
+# Do special thing for IPS
+
+```{r}
+# get the results by segment
+segment_results <- results_named[["Segment"]] 
+
+# Function to process monthly rate for each segment
+process_segment <- function(segment) {
+  segment_results |> 
+    filter(segment_function == segment) |> 
+    mutate(month = month(month, label = TRUE),
+            `Internal Fill Rate` = scales::percent(`Internal Fill Rate`, accuracy = 2)) |> 
+    select(month, `Internal Fill Rate`) |> 
+    pivot_wider(names_from = month, values_from = `Internal Fill Rate`) |> 
+    mutate(segment_function = segment, .before = "Jan")  # Add segment column for identification
+}
+
+# Apply the function to each unique segment
+all_segments_processed <- map_dfr(unique_segments, process_segment)
+
+write.xlsx(all_segments_processed, paste0("outputs/Internal Fill Rate Monthly by Segment ", start_date, " to ", end_date, ".xlsx"), overwrite = TRUE)
+```
 
 ### Validation Checks
 
