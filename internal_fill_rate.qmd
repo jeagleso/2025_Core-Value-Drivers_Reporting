@@ -290,10 +290,12 @@ unique_segments <- unique(segment_results$segment_function) |>
 process_segment <- function(segment) {
   segment_results |> 
     filter(segment_function == segment) |> 
-    mutate(month = month(month, label = TRUE),
-            `Internal Fill Rate` = scales::percent(`Internal Fill Rate`, accuracy = 2)) |> 
-    select(month, `Internal Fill Rate`) |> 
-    pivot_wider(names_from = month, values_from = `Internal Fill Rate`) |> 
+    mutate(month_label = month(month, label = TRUE),
+            `Internal Fill Rate` = scales::percent(`Internal Fill Rate`, accuracy = 2),
+            quarter_label = quarter(month, with_year = TRUE, fiscal_start = 1)) |> 
+    select(month_label, `Internal Fill Rate`) |> 
+    pivot_wider(names_from = month_label, 
+            values_from = `Internal Fill Rate`) |> 
     mutate(segment_function = segment, .before = "Jan")  # Add segment column for identification
 }
 
@@ -301,6 +303,16 @@ process_segment <- function(segment) {
 all_segments_processed <- map_dfr(unique_segments, process_segment)
 
 write.xlsx(all_segments_processed, paste0("outputs/Internal Fill Rate Monthly by Segment ", start_date, " to ", end_date, ".xlsx"), overwrite = TRUE)
+
+# should be one time so adding manual quarter columns
+# used this to create the formatted file to be shared
+all_monthly <- segment_results |>  
+  pivot_longer(cols = c("Roles Filled Internally", "Total Filled Roles", "Internal Fill Rate"),
+               names_to = "metric",
+               values_to = "value") |> 
+  pivot_wider(names_from = month, values_from = value)
+
+write.xlsx(all_monthly, "outputs/Internal Fill Rate Monthly 2024.xlsx")
 ```
 
 ### Validation Checks
