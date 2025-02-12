@@ -43,8 +43,8 @@ library(tidyverse)
 #| label: set_up
 
 # specify period: first date of current year and last day of previous month
-start_date <- "2024-01-01"
-end_date <- "2024-12-31"
+start_date <- as.Date("2024-01-01")
+end_date <- as.Date("2024-12-31")
 
 # define filters to get target population
 # manager+
@@ -88,7 +88,8 @@ file_path_pa_at <- "inputs/People Analytics - AT 2024.xlsx"
 
 # add career_level and internal/external flag
 df_pa_at <- readxl::read_xlsx(file_path_pa_at, skip = 4) |> 
-    janitor::clean_names() |>
+    janitor::clean_names() |> 
+  mutate(time_in_job_profile_start_date = as.Date(time_in_job_profile_start_date)) |> 
   mutate(career_level_bucket = factor(case_when(
     career_level %in% c("E2", "E3", "E4", "E5") ~ "VP",
     career_level %in% c("M5", "E1") ~ "Director",
@@ -108,7 +109,6 @@ df_pa_at <- readxl::read_xlsx(file_path_pa_at, skip = 4) |>
 # filter data to current period
 # add project filters to get target population
 pa_at <- df_pa_at |> 
-    mutate(time_in_job_profile_start_date = as.Date(time_in_job_profile_start_date)) |> 
     filter(time_in_job_profile_start_date >= start_date &
            time_in_job_profile_start_date <= end_date)
 ```
@@ -209,13 +209,27 @@ output_name <- paste0("outputs/Internal Fill Rate ", start_date, " to ", end_dat
 ```
 
 ```{r}
+# use openxlsx to format output as tables within excel
+library(openxlsx)
+
+wb <- createWorkbook()
+
+for (sheet_name in names(results_named)) {
+  addWorksheet(wb, sheet_name)
+  writeDataTable(wb, sheet = sheet_name, x = results_named[[sheet_name]], tableStyle = "TableStyleMedium2")
+}
+
+saveWorkbook(wb, output_name, overwrite = TRUE)
+```
+
+```{r}
 #| label: function_calculate_internal_fill_monthly
 
 # create function for internal fill calculation using df and running for each grouping_var by each month
 calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
-  tmp <- full_df |> 
-    mutate(month = floor_date(time_in_job_profile_start_date, "month")) |>  # Assuming there's a 'date' column
-    group_by(segment_function, month, internal_external) |> 
+  df <- df |> 
+    mutate(month = as.Date(floor_date(time_in_job_profile_start_date, "month"))) |>
+    group_by(across(all_of(grouping_var)), month, internal_external) |> 
     summarize(count = n(), .groups = "drop_last") |> 
     group_by(across(all_of(grouping_var)), month) |> 
     complete(internal_external = c("Internal", "External"), 
@@ -224,7 +238,7 @@ calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
            fill_rate = round(count / total, 4)) |> 
     ungroup() |> 
     filter(internal_external == "Internal") |> 
-    arrange(desc(total)) |> 
+    arrange(month) |> 
     select(-internal_external) |> 
     rename('Roles Filled Internally' = count,
            'Total Filled Roles' = total,
@@ -246,7 +260,7 @@ results_named <- set_names(results, output_sheet_names)
 results_named[["Data Details"]] <- full_df_scrubbed
 
 # name the output excel file
-output_name <- paste0("outputs/Internal Fill Rate Monthly", start_date, " to ", end_date, ".xlsx")
+output_name <- paste0("outputs/Internal Fill Rate Monthly ", start_date, " to ", end_date, ".xlsx")
 ```
 
 ```{r}
