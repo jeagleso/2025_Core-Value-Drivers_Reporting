@@ -10,16 +10,15 @@ editor: visual
 
 -   RRX\_-\_Worker_Data\_-\_Hires_and_Job_Changes Report (Movement Report)
 
-    
 ### Definitions
 
-- Period:
+-   Period:
 
     -   Start date: First date of current year
 
     -   End date: Last date of previous month
-    
-- internal_external:
+
+-   internal_external:
 
     -   External: hire date is the same as job profile start date
 
@@ -78,8 +77,6 @@ if (length(grouping_vars) != length(output_sheet_names)) {
 }
 ```
 
-
-
 ```{r}
 #| label: pa_at
 
@@ -130,8 +127,6 @@ worker_changes <- df_worker_changes |>
   filter(business_process_type != "Promote Employee Outbound") 
 ```
 
-
-
 ```{r}
 #| label: join_data
 
@@ -147,8 +142,6 @@ qa_multiple_moves <- full_df %>%
   filter(n() > 1) %>%
   ungroup()
 ```
-
-
 
 ```{r}
 #| label: data_to_share
@@ -166,7 +159,6 @@ full_df_scrubbed <- full_df |>
   mutate_at(vars(contains("date")), as.Date) |> 
   arrange(time_in_job_profile_start_date)
 ```
-
 
 ```{r}
 #| label: function_calculate_internal_fill
@@ -190,7 +182,6 @@ calculate_internal_fill <- function(df = full_df, grouping_var) {
   return(df)
 }
 ```
-
 
 ```{r}
 #| label: get_output
