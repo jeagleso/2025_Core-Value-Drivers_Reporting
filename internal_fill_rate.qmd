@@ -47,8 +47,8 @@ library(tidyverse)
 #| label: set_up
 
 # specify period: first date of current year and last day of previous month
-start_date <- floor_date(Sys.Date(), "year")
-end_date <- "2025-01-31"
+start_date <- as.Date(floor_date(Sys.Date(), "year"))
+end_date <- as.Date("2025-01-31")
 # end_date <- floor_date(Sys.Date(), "month") - days(1)
 
 # define filters to get target population
@@ -70,15 +70,17 @@ grouping_vars <- list(NULL,
                       c("segment_function", "division_function"), 
                       c("segment_function", "division_function", "business_unit_sub_function"),
                       c("segment_function", "division_function", "location"),
-                      c("segment_function", "career_level_bucket"))
+                      c("segment_function", "career_level_bucket"),
+                      "career_level_bucket")
 
 # set name for output sheet name for each grouping variable
-output_sheet_names <- c("Overall",
+output_sheet_names <- c("Enterprise",
                         "Segment",
                         "Segment by Division",
                         "Division by Subfunction",
                         "Division by Location",
-                        "Segment by Level")
+                        "Segment by Level",
+                        "Enterprise by Level")
 
 # check if the number of grouping variables matches the number of sheet names
 if (length(grouping_vars) != length(output_sheet_names)) {
