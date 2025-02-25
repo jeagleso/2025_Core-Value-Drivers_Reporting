@@ -1,7 +1,6 @@
 ---
 title: "Internal Fill Rate"
 format: html
-editor: visual
 ---
 
 ### Load data sources
@@ -48,7 +47,7 @@ library(tidyverse)
 
 # specify period: first date of current year and last day of previous month
 start_date <- as.Date(floor_date(Sys.Date(), "year"))
-end_date <- as.Date("2025-01-31")
+end_date <- as.Date("2025-02-28")
 # end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
 
 # define filters to get target population
@@ -98,7 +97,8 @@ file_path_pa_at <- "inputs/People Analytics - AT.xlsx"
 
 # add career_level and internal/external flag
 df_pa_at <- readxl::read_xlsx(file_path_pa_at, skip = 1) |> 
-    janitor::clean_names() |>
+  janitor::clean_names() |>
+  mutate(time_in_job_profile_start_date = as.Date(time_in_job_profile_start_date)) |> 
   mutate(career_level_bucket = factor(case_when(
     career_level %in% c("E2", "E3", "E4", "E5") ~ "VP",
     career_level %in% c("M5", "E1") ~ "Director",
@@ -145,7 +145,7 @@ df_worker_changes <- df_worker_changes_raw |>
   select(employee_id, effective_date, business_process_type, business_process_reason, 
          starts_with("prior_"), starts_with("new_")) 
 
-# remove duplicate row for promotions - both inbound and outbound
+# remove duplicate row for promotions - both inbound and outbound on report
 worker_changes <- df_worker_changes |>
   filter(business_process_type != "Promote Employee Outbound") 
 ```
@@ -185,7 +185,7 @@ full_df_scrubbed <- full_df |>
     is.na(business_process_reason) ~ NA,
     TRUE ~ time_in_job_profile_start_date)) |> 
   select(employee_id, worker, hire_date, time_in_job_profile_start_date, internal_external, 
-         segment_function, division_function, location, career_level, 
+         segment_function, division_function, business_unit_sub_function, location, career_level, 
          effective_date, business_process_type, business_process_reason, 
          prior_job_profile, prior_career_level, prior_comp_grade, 
          new_job_profile, new_career_level, new_comp_grade) |> 
@@ -224,7 +224,7 @@ calculate_internal_fill <- function(df = full_df, grouping_var) {
 # create function for internal fill calculation using df and running for each grouping_var by each month
 calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
   df <- df |> 
-    mutate(month = floor_date(time_in_job_profile_start_date, "month")) |>  # Assuming there's a 'date' column
+    mutate(month = as.Date(floor_date(time_in_job_profile_start_date, "month"))) |> 
     group_by(across(all_of(grouping_var)), month, internal_external) |> 
     summarize(count = n(), .groups = "drop_last") |> 
     group_by(across(all_of(grouping_var)), month) |> 
@@ -234,7 +234,7 @@ calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
            fill_rate = round(count / total, 4)) |> 
     ungroup() |> 
     filter(internal_external == "Internal") |> 
-    arrange(desc(total)) |> 
+    arrange(month) |> 
     select(-internal_external) |> 
     rename('Roles Filled Internally' = count,
            'Total Filled Roles' = total,
@@ -285,6 +285,20 @@ for (sheet_name in names(results_named)) {
 }
 
 # saveWorkbook(wb, output_name, overwrite = TRUE)
+```
+
+```{r}
+# run IFR function for each grouping variable
+monthly_results <- map(grouping_vars, ~calculate_internal_fill_monthly(full_df, .x))
+
+# name each grouping var output to its sheet name
+monthly_results_named <- set_names(monthly_results, output_sheet_names)
+
+# add the scrubbed data details
+monthly_results_named[["Data Details"]] <- full_df_scrubbed
+
+# name the output excel file
+output_name <- paste0("output/Internal Fill Rate Monthly ", start_date, " to ", end_date, ".xlsx")
 ```
 
 
