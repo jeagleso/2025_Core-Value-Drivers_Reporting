@@ -235,11 +235,23 @@ calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
     ungroup() |> 
     filter(internal_external == "Internal") |> 
     arrange(month) |> 
-    select(-internal_external) |> 
+    select(-internal_external) 
+
+  ytd <- df |> 
+    group_by(across(all_of(grouping_var))) |> 
+    summarize(count = sum(count),
+              total = sum(total),
+              fill_rate = count / total, .groups = "drop_last") |> 
+    mutate(month = "ytd")
+    
+  binded_df <- df |> 
+    mutate(month = as.character(month)) |> 
+    bind_rows(ytd) |> 
     rename('Roles Filled Internally' = count,
            'Total Filled Roles' = total,
            'Internal Fill Rate' = fill_rate)
-  return(df)
+  
+  return(binded_df)
 }
 ```
 
@@ -286,6 +298,7 @@ for (sheet_name in names(results_named)) {
 
 # saveWorkbook(wb, output_name, overwrite = TRUE)
 ```
+
 
 ```{r}
 # run IFR function for each grouping variable
