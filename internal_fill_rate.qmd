@@ -96,7 +96,7 @@ if (length(grouping_vars) != length(output_sheet_names)) {
 file_path_pa_at <- "inputs/People Analytics - AT.xlsx"
 
 # add career_level and internal/external flag
-df_pa_at <- readxl::read_xlsx(file_path_pa_at, skip = 1) |> 
+df_pa_at <- readxl::read_xlsx(file_path_pa_at, skip = 4) |> 
   janitor::clean_names() |>
   mutate(time_in_job_profile_start_date = as.Date(time_in_job_profile_start_date)) |> 
   mutate(career_level_bucket = factor(case_when(
