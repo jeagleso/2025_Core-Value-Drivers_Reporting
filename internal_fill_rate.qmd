@@ -272,6 +272,19 @@ output_name <- paste0("outputs/Internal Fill Rate ", start_date, " to ", end_dat
 ```
 
 
+```{r}
+# run IFR function for each grouping variable
+monthly_results <- map(grouping_vars, ~calculate_internal_fill_monthly(full_df, .x))
+
+# name each grouping var output to its sheet name
+monthly_results_named <- set_names(monthly_results, output_sheet_names)
+
+# add the scrubbed data details
+monthly_results_named[["Data Details"]] <- full_df_scrubbed
+
+# name the output excel file
+output_name <- paste0("output/Internal Fill Rate Monthly ", start_date, " to ", end_date, ".xlsx")
+```
 
 ```{r}
 # use openxlsx to format output as tables within excel
@@ -298,22 +311,6 @@ for (sheet_name in names(results_named)) {
 
 # saveWorkbook(wb, output_name, overwrite = TRUE)
 ```
-
-
-```{r}
-# run IFR function for each grouping variable
-monthly_results <- map(grouping_vars, ~calculate_internal_fill_monthly(full_df, .x))
-
-# name each grouping var output to its sheet name
-monthly_results_named <- set_names(monthly_results, output_sheet_names)
-
-# add the scrubbed data details
-monthly_results_named[["Data Details"]] <- full_df_scrubbed
-
-# name the output excel file
-output_name <- paste0("output/Internal Fill Rate Monthly ", start_date, " to ", end_date, ".xlsx")
-```
-
 
 ### Validation Checks
 
