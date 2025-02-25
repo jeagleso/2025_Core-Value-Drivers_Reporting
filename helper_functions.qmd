@@ -1,0 +1,14 @@
+---
+title: "helper functions"
+format: html
+---
+
+### Leader Hierarchy / Manager Chain
+
+
+```{r}
+# get manager chain
+library(hR)
+
+tmp <- hierarchy(ee = df_pa_at$employee_id, supv = df_pa_at$manager_id, format = "long")
+```
