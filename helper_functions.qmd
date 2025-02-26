@@ -5,10 +5,29 @@ format: html
 
 ### Leader Hierarchy / Manager Chain
 
-
 ```{r}
 # get manager chain
 library(hR)
 
 tmp <- hierarchy(ee = df_pa_at$employee_id, supv = df_pa_at$manager_id, format = "long")
+```
+
+
+```{r}
+# if you need to read and combine monthly files (e.g., multiple term or headcount files)
+read_and_combine <- function(directory_path, row_skip) {
+  files <- list.files(directory_path, full.names = TRUE, pattern = "*.xlsx")
+  data_list <- lapply(files, function(file) {
+    data <- readxl::read_xlsx(file, sheet = "Raw Data", skip = row_skip) |> 
+      janitor::clean_names() |> 
+      filter(worker_type == "Employee") 
+    data <- data |> 
+      mutate(source_file = basename(file)) |> 
+      mutate(effective_date = str_extract(source_file, 
+                                          "(?<=2024 ).*(?=\\.xlsx)") |> ymd())
+    return(data)
+  })
+  combined_data <- bind_rows(data_list)
+  return(combined_data)
+}
 ```
