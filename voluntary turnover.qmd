@@ -9,76 +9,73 @@ editor: visual
 #| warning: false
 library(tidyverse)
 
-directory_active <- "C:/Users/610171734/OneDrive - Regal Rexnord/Documents/2024/2024_Core Value Drivers_Reporting/inputs/2024_HC"
+# specify period: first date of current year and last day of previous month
+start_date <- as.Date(floor_date(Sys.Date(), "year"))
+end_date <- as.Date("2025-02-28")
+# end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
 
-directory_terms <- "C:/Users/610171734/OneDrive - Regal Rexnord/Documents/2024/2024_Core Value Drivers_Reporting/inputs/2024_Terms"
+# get all months included in period
+months_included <- seq(start_date, end_date, by = "month")
 
-read_and_combine <- function(directory_path, row_skip) {
-  files <- list.files(directory_path, full.names = TRUE, pattern = "*.xlsx")
-  data_list <- lapply(files, function(file) {
-    data <- readxl::read_xlsx(file, sheet = "Raw Data", skip = row_skip) |> 
-      janitor::clean_names() |> 
-      filter(worker_type == "Employee") 
-    data <- data |> 
-      mutate(source_file = basename(file)) |> 
-      mutate(effective_date = str_extract(source_file, 
-                                          "(?<=2024 ).*(?=\\.xlsx)") |> ymd())
-    return(data)
-  })
-  combined_data <- bind_rows(data_list)
-  return(combined_data)
+# get the last date of each month
+last_day_of_month <- ceiling_date(months_included, "month") - days(1)
+
+# data frame with all months
+monthly_data <- tibble(last_day_of_month = as.Date(last_day_of_month))
+
+# filters to be applied
+apply_filters <- function(df) {
+  df |>  
+    filter(worker_type == "Employee") |> 
+    filter((job_family_group != "Human Resources") |> replace_na(TRUE))
 }
-
-headcount_data <- read_and_combine(directory_path = directory_active, 
-                                   row_skip = 17)
-
-termination_data <- read_and_combine(directory_path = directory_terms, 
-                                     row_skip = 12)
 ```
 
 ```{r}
-#| label: calculate_turnover_monthly_files
+#| label: get_data
 
-monthly_turnover_rate_monthly_files <- termination_data |> 
-  group_by(month = floor_date(termination_date, "month")) |> 
-  summarize(terminations = n()) |> 
-  left_join(
-    headcount_data |> 
-      group_by(month = floor_date(effective_date, "month")) |> 
-      summarize(headcount = n()), by = "month") |> 
-  mutate(turnover_rate = (terminations / headcount) * 100)
+# get active and terminated, add career_level bucket
+active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 4) |> 
+  janitor::clean_names() |> 
+  mutate(career_level_bucket = factor(case_when(
+    career_level %in% c("E2", "E3", "E4", "E5") ~ "VP",
+    career_level %in% c("M5", "E1") ~ "Director",
+    career_level %in% c("M2", "M3", "M4") ~ "Manager",
+    career_level == "M1" ~ "Supervisor",
+    career_level %in% c("P1", "P2", "P3", "P4", "P5", "P6") ~ "Professional",
+    career_level %in% c("AT1", "AT2", "AT3", "AT4") ~ "Administrative_Technical",
+    is.na(career_level) ~ "None",
+    TRUE ~ "ERROR_unmapped_level"),
+    levels = c("VP", "Director", "Manager", "Supervisor", "Professional", "Administrative_Technical", "None", "ERROR_unmapped_level"),
+    ordered = TRUE))
 
+pa_at <- active_and_terminated |> 
+  apply_filters()
 ```
 
 ```{r}
 #| label: calculate_turnover_at_file
 
-active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip =1) |> 
-  janitor::clean_names() |> 
-  filter(segment_function != "Industrial Systems")
-
-a_t_employees <- active_and_terminated |> 
-  filter(worker_type == "Employee")
-
-months_included <- seq(as.Date("2024-01-01"), as.Date("2024-12-31"), by = "month")
-
-last_day_of_month <- ceiling_date(months_included, "month") - days(1)
-
-# data frame with all months
-monthly_data <- tibble(last_day_of_month = last_day_of_month)
-
 monthly_turnover_rate_at_file <- monthly_data |>
   rowwise() |> 
   mutate(
     previous_month = floor_date(last_day_of_month, unit = "month") - days(1),
-    terminations = sum(!is.na(a_t_employees$termination_date) & 
-                       a_t_employees$termination_date <= last_day_of_month & 
-                       a_t_employees$termination_date > previous_month),
-    headcount = sum(a_t_employees$hire_date <= last_day_of_month & 
-                      (is.na(a_t_employees$termination_date) |
-                         a_t_employees$termination_date >= last_day_of_month))) |> 
+    voluntary_terminations = sum(!is.na(pa_at$termination_date) & 
+                        pa_at$termination_category == "Terminate Employee > Voluntary" &
+                       pa_at$termination_date <= last_day_of_month & 
+                       pa_at$termination_date > previous_month),
+    headcount = sum(pa_at$hire_date <= last_day_of_month & 
+                      (is.na(pa_at$termination_date) |
+                         pa_at$termination_date >= last_day_of_month))) |> 
   ungroup() |> 
-  mutate(turnover_rate = terminations / headcount)
+  mutate(voluntary_turnover = voluntary_terminations / headcount)
+
+tmp_jan_hc <- pa_at |> 
+  filter(pa_at$hire_date <= as.Date("2025-01-31") & 
+                      (is.na(pa_at$termination_date) |
+                         pa_at$termination_date >= as.Date("2025-01-31")))
+
+# write.csv(tmp_jan_hc, "tmp_jan_headcount.csv")
 ```
 
 FAQ:
