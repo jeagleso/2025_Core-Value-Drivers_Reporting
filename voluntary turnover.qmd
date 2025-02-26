@@ -31,6 +31,25 @@ apply_filters <- function(df) {
     filter((job_family_group != "Human Resources") |> replace_na(TRUE)) |> 
     filter(segment_function != "Industrial Systems")
 }
+
+# set the grouping variables of interest
+# if changing grouping variables, also add output_sheet_name
+grouping_vars <- list(NULL, 
+                      "segment_function", 
+                      c("segment_function", "division_function"), 
+                      c("segment_function", "division_function", "business_unit_sub_function"),
+                      c("segment_function", "division_function", "location"),
+                      c("segment_function", "career_level_bucket"),
+                      "career_level_bucket")
+
+# set name for output sheet name for each grouping variable
+output_sheet_names <- c("Enterprise",
+                        "Segment",
+                        "Segment by Division",
+                        "Division by Subfunction",
+                        "Division by Location",
+                        "Segment by Level",
+                        "Enterprise by Level")
 ```
 
 ```{r}
@@ -115,37 +134,15 @@ calculate_voluntary_turnover_monthly <- function(grouping_var) {
   
   return(final_results)
 }
+```
 
-
+```{r}
+# get results for all grouping variable combinations
 monthly_turnover_data <- map(grouping_vars, ~ calculate_voluntary_turnover_monthly(.x)) |> 
   set_names(output_sheet_names)
+```
 
-
-
-#   ytd <- monthly_results |> 
-#     group_by(across(all_of(grouping_var))) |> 
-#     summarize(
-#       voluntary_terminations = sum(voluntary_terminations),
-#       headcount = mean(headcount, na.rm = TRUE),
-#       voluntary_turnover = voluntary_terminations / headcount
-#     ) |> 
-#       mutate(month = "ytd",
-#               ytd_annualized = voluntary_turnover * (12 / length(last_day_of_month)))
-
-#   result <- monthly_results |> 
-#     mutate(month = as.character(month)) |> 
-#     bind_rows(ytd)
-
-#   return(result)
-
-
-
-# last_day_of_month <- seq.Date(from = as.Date("2025-01-31"), to = as.Date("2025-03-01"), by = "month")
-# grouping_var <- "segment_function"
-
-# calculate_voluntary_turnover("segment_function")
-
-
+```{r}
 # monthly turnover rate for enterprise
 monthly_turnover_rate_at_file <- monthly_data |>
   rowwise() |> 
@@ -160,7 +157,6 @@ monthly_turnover_rate_at_file <- monthly_data |>
                          pa_at$termination_date >= last_day_of_month))) |> 
   ungroup() |> 
   mutate(voluntary_turnover = voluntary_terminations / headcount)
-
 ```
 
 FAQ:
