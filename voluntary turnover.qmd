@@ -24,6 +24,7 @@ last_day_of_month <- ceiling_date(months_included, "month") - days(1)
 monthly_data <- tibble(last_day_of_month = as.Date(last_day_of_month))
 
 # filters to be applied
+# filter() does not include NA by default
 apply_filters <- function(df) {
   df |>  
     filter(worker_type == "Employee") |> 
@@ -56,6 +57,32 @@ pa_at <- active_and_terminated |>
 ```{r}
 #| label: calculate_turnover_at_file
 
+tmp <- map_df(last_day_of_month, function(date) {
+  
+  headcount <- pa_at |> 
+    filter(hire_date <= date & (is.na(termination_date) | termination_date >= date)) |> 
+    group_by(segment_function) |> 
+    summarize(headcount = n(), .groups = 'drop')
+
+  voluntary_terminations <- pa_at |> 
+    filter(termination_category == "Terminate Employee > Voluntary" &
+          termination_date >= floor_date(date, "month") &
+          termination_date <= date) |> 
+    group_by(segment_function) |> 
+    summarize(voluntary_terminations = n(), .groups = 'drop')
+
+  result <- left_join(headcount, voluntary_terminations, by = "segment_function") |> 
+    mutate(
+      date = date,
+      voluntary_terminations = coalesce(voluntary_terminations, 0),
+      voluntary_turnover = voluntary_terminations / headcount
+      )
+  
+  return(result)
+})
+
+
+# monthly turnover rate for enterprise
 monthly_turnover_rate_at_file <- monthly_data |>
   rowwise() |> 
   mutate(
@@ -70,12 +97,6 @@ monthly_turnover_rate_at_file <- monthly_data |>
   ungroup() |> 
   mutate(voluntary_turnover = voluntary_terminations / headcount)
 
-tmp_jan_hc <- pa_at |> 
-  filter(pa_at$hire_date <= as.Date("2025-01-31") & 
-                      (is.na(pa_at$termination_date) |
-                         pa_at$termination_date >= as.Date("2025-01-31")))
-
-# write.csv(tmp_jan_hc, "tmp_jan_headcount.csv")
 ```
 
 FAQ:
