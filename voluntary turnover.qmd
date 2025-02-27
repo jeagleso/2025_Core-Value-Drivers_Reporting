@@ -65,13 +65,16 @@ active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", 
     career_level == "M1" ~ "Supervisor",
     career_level %in% c("P1", "P2", "P3", "P4", "P5", "P6") ~ "Professional",
     career_level %in% c("AT1", "AT2", "AT3", "AT4") ~ "Administrative_Technical",
-    is.na(career_level) ~ "None",
+    is.na(career_level) ~ "DL_IDL",
     TRUE ~ "ERROR_unmapped_level"),
-    levels = c("VP", "Director", "Manager", "Supervisor", "Professional", "Administrative_Technical", "None", "ERROR_unmapped_level"),
+    levels = c("VP", "Director", "Manager", "Supervisor", "Professional", "Administrative_Technical", "DL_IDL", "ERROR_unmapped_level"),
     ordered = TRUE))
 
+# apply generic filters
+# run once with all except DL/IDL and one with only DL/IDL
 pa_at <- active_and_terminated |> 
-  apply_filters()
+  apply_filters() |> 
+  filter(career_level_bucket != "DL_IDL")
 ```
 
 ```{r}
@@ -189,9 +192,9 @@ for (sheet_name in names(monthly_turnover_data)) {
   ytd_annualized_col <- which(names(monthly_turnover_data[[sheet_name]]) == "ytd_annualized")
 
   # format vt and annualized as a percent
-  addStyle(wb, sheet = sheet_name, style = createStyle(numFmt = "0%"), cols = voluntary_turnover_col, 
+  addStyle(wb, sheet = sheet_name, style = createStyle(numFmt = "0.0%"), cols = voluntary_turnover_col, 
           rows = 2:(nrow(monthly_turnover_data[[sheet_name]]) + 1), gridExpand = TRUE)
-  addStyle(wb, sheet = sheet_name, style = createStyle(numFmt = "0%"), cols = ytd_annualized_col, 
+  addStyle(wb, sheet = sheet_name, style = createStyle(numFmt = "0.0%"), cols = ytd_annualized_col, 
           rows = 2:(nrow(monthly_turnover_data[[sheet_name]]) + 1), gridExpand = TRUE)
 }
 
@@ -215,41 +218,31 @@ monthly_turnover_rate_at_file <- monthly_data |>
   mutate(voluntary_turnover = voluntary_terminations / headcount)
 ```
 
-FAQ:
-
--   Associates are included in headcount if their termination day is on or after the last day of the month (e.g., an Associate will be included in January's headcount if their termination date is 1/31 or later).
-
-# HIPO Jerry Morton
 
 ```{r}
-a_t_aip <- active_and_terminated |> 
+# special IPS AIP hipo turnover
+output_ips_hipo <- paste0("IPS HIPO Voluntary Turnover ", start_date, " to ", end_date, ".csv")
+
+# add filters for aip metric
+pa_at <- pa_at |> 
   filter(x9box_numeric %in% c("3.3", "3.2", "2.3")) |> 
   filter(x9box_potential != "Too New To Rate" & 
            x9box_potential != "New to Company") |> 
   filter(management_chain_level_2 == "Jerry Morton")
 
-# assumes running YTD through last full month of current year
-months_included <- seq(floor_date(Sys.Date(), "year"), 
-          floor_date(Sys.Date(), "month") - days(1), by = "month")
+# run formula without grouping variable, remove "enterprise" column
+ips_aip_hipo <- calculate_voluntary_turnover_monthly(grouping_var = NULL) |> 
+  select(-Enterprise)
 
-last_day_of_month <- ceiling_date(months_included, "month") - days(1)
-
-# data frame with all months
-monthly_data <- tibble(last_day_of_month = last_day_of_month)
-
-monthly_turnover_rate_at_file <- monthly_data |>
-  rowwise() |> 
-  mutate(
-    previous_month = floor_date(last_day_of_month, unit = "month") - days(1),
-    terminations = sum(!is.na(a_t_aip$termination_date) & 
-                       a_t_aip$termination_date <= last_day_of_month & 
-                       a_t_aip$termination_date > previous_month),
-    headcount = sum(a_t_aip$hire_date <= last_day_of_month & 
-                      (is.na(a_t_aip$termination_date) |
-                         a_t_aip$termination_date >= last_day_of_month))) |> 
-  ungroup() |> 
-  mutate(turnover_rate = terminations / headcount)
+# writ einto ips_aip outputs
+write.csv(ips_aip_hipo, paste0("outputs/ips_aip/", output_ips_hipo), 
+  row.names = FALSE)
 ```
+
+FAQ:
+
+-   Associates are included in headcount if their termination day is on or after the last day of the month (e.g., an Associate will be included in January's headcount if their termination date is 1/31 or later).
+
 
 ### Future Ideas
 
