@@ -107,7 +107,7 @@ calculate_voluntary_turnover_monthly <- function(grouping_var) {
     mutate(
       date = month(date, label = TRUE),
       voluntary_terminations = coalesce(voluntary_terminations, 0), # returns 0 if none
-      voluntary_turnover = voluntary_terminations / headcount
+      voluntary_turnover = round(voluntary_terminations / headcount, 4)
       )
   
   return(result)
@@ -119,12 +119,12 @@ calculate_voluntary_turnover_monthly <- function(grouping_var) {
     summarize(
       voluntary_terminations = sum(voluntary_terminations),
       headcount = mean(headcount, na.rm = TRUE),
-      voluntary_turnover = voluntary_terminations / headcount,
+      voluntary_turnover = round(voluntary_terminations / headcount, 4),
       .groups = 'drop'
     ) |> 
     mutate(
       date = "YTD",
-      ytd_annualized = voluntary_turnover * (12 / length(last_day_of_month))
+      ytd_annualized = round(voluntary_turnover * (12 / length(last_day_of_month)), 4)
     )
   
   # combine monthly and YTD results
@@ -154,7 +154,7 @@ headcount <- pa_at |>
 return(headcount)
 })
 
-# separates one monthly df into one for each month
+# separates one df into one for each month
 monthly_headcount_named <- monthly_headcount |> 
   nest_by(date) |> 
   mutate(data = set_names(list(data), date))
@@ -164,12 +164,38 @@ for (i in unique(monthly_headcount_named$date)) {
   monthly_turnover_data[[i]] <- monthly_headcount_named$data[[which(monthly_headcount_named$date == i)]]
 }
 
-
 # get vol terms sheet
-voluntary_terminations <- pa_at |> 
+monthly_turnover_data[["Voluntary Terms"]] <- pa_at |> 
   filter(termination_category == "Terminate Employee > Voluntary" &
         termination_date >= floor_date(start_date, "month") &
         termination_date <= end_date)
+```
+
+```{r}
+# create output
+library(openxlsx)
+
+# name the output excel file
+output_name <- paste0("outputs/Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
+
+wb <- createWorkbook()
+
+for (sheet_name in names(monthly_turnover_data)) {
+  addWorksheet(wb, sheet_name)
+  writeDataTable(wb, sheet = sheet_name, x = monthly_turnover_data[[sheet_name]], tableStyle = "TableStyleMedium2")
+
+  # get column index for voluntary turnover and ytd_annualized
+  voluntary_turnover_col <- which(names(monthly_turnover_data[[sheet_name]]) == "voluntary_turnover")
+  ytd_annualized_col <- which(names(monthly_turnover_data[[sheet_name]]) == "ytd_annualized")
+
+  # format vt and annualized as a percent
+  addStyle(wb, sheet = sheet_name, style = createStyle(numFmt = "0%"), cols = voluntary_turnover_col, 
+          rows = 2:(nrow(monthly_turnover_data[[sheet_name]]) + 1), gridExpand = TRUE)
+  addStyle(wb, sheet = sheet_name, style = createStyle(numFmt = "0%"), cols = ytd_annualized_col, 
+          rows = 2:(nrow(monthly_turnover_data[[sheet_name]]) + 1), gridExpand = TRUE)
+}
+
+saveWorkbook(wb, output_name, overwrite = TRUE)
 ```
 
 ```{r}
@@ -192,23 +218,6 @@ monthly_turnover_rate_at_file <- monthly_data |>
 FAQ:
 
 -   Associates are included in headcount if their termination day is on or after the last day of the month (e.g., an Associate will be included in January's headcount if their termination date is 1/31 or later).
-
-```{r}
-jan_hc <- readxl::read_xlsx("C:/Users/610171734/OneDrive - Regal Rexnord/Documents/2024/2024_Core Value Drivers_Reporting/inputs/2024_HC/RRX - Data Validation_1 JAN2024 2024-01-31.xlsx", sheet = "Raw Data", skip = 17) |> 
-  janitor::clean_names()
-
-tmp <- jan_hc |> 
-  filter(segment_function_l1 != "Industrial Systems") |> 
-  filter(worker_type == "Employee")
-
-# Filter to include only employees in the effective date headcount
-tmp_headcount <- active_and_terminated_employees %>%
-  filter(hire_date <= "2024-01-31" & 
-         (is.na(termination_date) | termination_date >= "2024-01-31"))
-
-# Write the filtered data to a CSV file
-write.csv(tmp_headcount, "tmp_jan_headcount.csv", row.names = FALSE)
-```
 
 # HIPO Jerry Morton
 
