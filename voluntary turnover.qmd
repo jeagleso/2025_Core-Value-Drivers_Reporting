@@ -107,7 +107,7 @@ calculate_voluntary_turnover_monthly <- function(grouping_var) {
     mutate(
       date = month(date, label = TRUE),
       voluntary_terminations = coalesce(voluntary_terminations, 0), # returns 0 if none
-      voluntary_turnover = voluntary_terminations / headcount)
+      voluntary_turnover = voluntary_terminations / headcount
       )
   
   return(result)
@@ -119,7 +119,8 @@ calculate_voluntary_turnover_monthly <- function(grouping_var) {
     summarize(
       voluntary_terminations = sum(voluntary_terminations),
       headcount = mean(headcount, na.rm = TRUE),
-      voluntary_turnover = voluntary_terminations / headcount
+      voluntary_turnover = voluntary_terminations / headcount,
+      .groups = 'drop'
     ) |> 
     mutate(
       date = "YTD",
@@ -140,6 +141,29 @@ calculate_voluntary_turnover_monthly <- function(grouping_var) {
 # get results for all grouping variable combinations
 monthly_turnover_data <- map(grouping_vars, ~ calculate_voluntary_turnover_monthly(.x)) |> 
   set_names(output_sheet_names)
+```
+
+```{r}
+# get headcount sheets
+monthly_headcount <- map_df(last_day_of_month, function(date) {
+
+headcount <- pa_at |> 
+  filter(hire_date <= date & (is.na(termination_date) | termination_date >= date)) |> 
+  mutate(date = month(date, label = TRUE))
+
+return(headcount)
+})
+
+monthly_headcount_named <- monthly_headcount |> 
+  nest(.by = date)
+
+monthly_turnover_data[["headcounts"]] <- monthly_headcount_named
+
+# get vol terms sheet
+voluntary_terminations <- pa_at |> 
+  filter(termination_category == "Terminate Employee > Voluntary" &
+        termination_date >= floor_date(start_date, "month") &
+        termination_date <= end_date)
 ```
 
 ```{r}
