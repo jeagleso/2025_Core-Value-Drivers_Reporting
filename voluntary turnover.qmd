@@ -144,7 +144,7 @@ monthly_turnover_data <- map(grouping_vars, ~ calculate_voluntary_turnover_month
 ```
 
 ```{r}
-# get headcount sheets
+# get a df with all active in each month
 monthly_headcount <- map_df(last_day_of_month, function(date) {
 
 headcount <- pa_at |> 
@@ -154,10 +154,16 @@ headcount <- pa_at |>
 return(headcount)
 })
 
+# separates one monthly df into one for each month
 monthly_headcount_named <- monthly_headcount |> 
-  nest(.by = date)
+  nest_by(date) |> 
+  mutate(data = set_names(list(data), date))
 
-monthly_turnover_data[["headcounts"]] <- monthly_headcount_named
+# adds a df for each monthly headcount
+for (i in unique(monthly_headcount_named$date)) {
+  monthly_turnover_data[[i]] <- monthly_headcount_named$data[[which(monthly_headcount_named$date == i)]]
+}
+
 
 # get vol terms sheet
 voluntary_terminations <- pa_at |> 
