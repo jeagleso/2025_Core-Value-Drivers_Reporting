@@ -4,14 +4,29 @@ format: html
 editor: visual
 ---
 
+Run each month:
+
+- update People Analytics - AT file
+- check start and end date
+- run script
+- change pa_at filter to only DL/IDL
+- change output name to include DL/IDL
+- run script
+
+To run for 2024 update:
+
+- start and end date
+- AT file to 2024
+
 ```{r}
 #| label: setup
 #| warning: false
 library(tidyverse)
 
 # specify period: first date of current year and last day of previous month
-start_date <- as.Date(floor_date(Sys.Date(), "year"))
-end_date <- as.Date("2025-02-28")
+# start_date <- as.Date(floor_date(Sys.Date(), "year"))
+start_date <- as.Date("2024-01-01")
+end_date <- as.Date("2024-12-31")
 # end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
 
 # get all months included in period
@@ -56,7 +71,7 @@ output_sheet_names <- c("Enterprise",
 #| label: get_data
 
 # get active and terminated, add career_level bucket
-active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 4) |> 
+active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT 2024.xlsx", skip = 4) |> 
   janitor::clean_names() |> 
   mutate(career_level_bucket = factor(case_when(
     career_level %in% c("E2", "E3", "E4", "E5") ~ "VP",
@@ -152,7 +167,11 @@ monthly_headcount <- map_df(last_day_of_month, function(date) {
 
 headcount <- pa_at |> 
   filter(hire_date <= date & (is.na(termination_date) | termination_date >= date)) |> 
-  mutate(date = month(date, label = TRUE))
+  mutate(date = month(date, label = TRUE)) |> 
+  select(employee_id, worker, hire_date, 
+  termination_date, termination_category, termination_reason, 
+  segment_function, division_function, business_unit_sub_function, management_chain_level_2,
+  location, career_level, date)
 
 return(headcount)
 })
@@ -171,7 +190,12 @@ for (i in unique(monthly_headcount_named$date)) {
 monthly_turnover_data[["Voluntary Terms"]] <- pa_at |> 
   filter(termination_category == "Terminate Employee > Voluntary" &
         termination_date >= floor_date(start_date, "month") &
-        termination_date <= end_date)
+        termination_date <= end_date) |> 
+  select(employee_id, worker, hire_date, 
+  termination_date, termination_category, termination_reason, 
+  segment_function, division_function, business_unit_sub_function, management_chain_level_2,
+  location, career_level) |> 
+  mutate_at(vars(contains("date")), as.Date)
 ```
 
 ```{r}
@@ -179,7 +203,7 @@ monthly_turnover_data[["Voluntary Terms"]] <- pa_at |>
 library(openxlsx)
 
 # name the output excel file
-output_name <- paste0("outputs/Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
+output_name <- paste0("outputs/Professional Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
 
 wb <- createWorkbook()
 
