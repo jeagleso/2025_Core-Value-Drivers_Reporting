@@ -227,6 +227,7 @@ saveWorkbook(wb, output_name, overwrite = TRUE)
 ```
 
 ```{r}
+# shouldn't need to use
 # monthly turnover rate for enterprise
 monthly_turnover_rate_at_file <- monthly_data |>
   rowwise() |> 
