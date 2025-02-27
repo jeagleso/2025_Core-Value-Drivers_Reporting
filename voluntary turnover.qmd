@@ -16,6 +16,8 @@ Run each month:
 To run for 2024 update:
 
 - start and end date
+  - start_date <- as.Date("2024-01-01")
+  - end_date <- as.Date("2024-12-31")
 - AT file to 2024
 
 ```{r}
@@ -24,9 +26,8 @@ To run for 2024 update:
 library(tidyverse)
 
 # specify period: first date of current year and last day of previous month
-# start_date <- as.Date(floor_date(Sys.Date(), "year"))
-start_date <- as.Date("2024-01-01")
-end_date <- as.Date("2024-12-31")
+start_date <- as.Date(floor_date(Sys.Date(), "year"))
+end_date <- as.Date("2025-02-28")
 # end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
 
 # get all months included in period
@@ -71,7 +72,7 @@ output_sheet_names <- c("Enterprise",
 #| label: get_data
 
 # get active and terminated, add career_level bucket
-active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT 2024.xlsx", skip = 4) |> 
+active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 4) |> 
   janitor::clean_names() |> 
   mutate(career_level_bucket = factor(case_when(
     career_level %in% c("E2", "E3", "E4", "E5") ~ "VP",
