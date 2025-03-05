@@ -27,8 +27,8 @@ library(tidyverse)
 
 # specify period: first date of current year and last day of previous month
 start_date <- as.Date(floor_date(Sys.Date(), "year"))
-end_date <- as.Date("2025-02-28")
-# end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
+# end_date <- as.Date("2025-02-28")
+end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
 
 # get all months included in period
 months_included <- seq(start_date, end_date, by = "month")
@@ -90,7 +90,8 @@ active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", 
 # run once with all except DL/IDL and one with only DL/IDL
 pa_at <- active_and_terminated |> 
   apply_filters() |> 
-  filter(career_level_bucket != "DL_IDL")
+  # filter(career_level_bucket != "DL_IDL")
+ filter(career_level_bucket == "DL_IDL")
 ```
 
 ```{r}
@@ -203,8 +204,10 @@ monthly_turnover_data[["Voluntary Terms"]] <- pa_at |>
 # create output
 library(openxlsx)
 
-# name the output excel file
-output_name <- paste0("outputs/Professional Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
+# name the output excel file for professional
+# output_name <- paste0("outputs/Professional Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
+# name the output excel file for manufacturing
+output_name <- paste0("outputs/Manufacturing Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
 
 wb <- createWorkbook()
 
@@ -264,6 +267,7 @@ ips_aip_hipo <- calculate_voluntary_turnover_monthly(grouping_var = NULL) |>
 write.csv(ips_aip_hipo, paste0("outputs/ips_aip/", output_ips_hipo), 
   row.names = FALSE)
 ```
+
 
 FAQ:
 
