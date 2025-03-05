@@ -27,8 +27,11 @@ library(tidyverse)
 
 # specify period: first date of current year and last day of previous month
 start_date <- as.Date(floor_date(Sys.Date(), "year"))
-# end_date <- as.Date("2025-02-28")
 end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
+
+# use for 2024 file
+# start_date <- as.Date("2024-01-01")
+# end_date <- as.Date("2024-12-31")
 
 # get all months included in period
 months_included <- seq(start_date, end_date, by = "month")
