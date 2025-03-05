@@ -47,8 +47,11 @@ library(tidyverse)
 
 # specify period: first date of current year and last day of previous month
 start_date <- as.Date(floor_date(Sys.Date(), "year"))
-end_date <- as.Date("2025-02-28")
-# end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
+end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
+
+# for 2024
+# start_date <- as.Date("2024-01-01")
+# end_date <- as.Date("2024-12-31")
 
 # define filters to get target population
 # supervisor+
@@ -259,16 +262,16 @@ calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
 #| label: get_output
 
 # run IFR function for each grouping variable
-results <- map(grouping_vars, ~ calculate_internal_fill(full_df, .x))
+# results <- map(grouping_vars, ~ calculate_internal_fill(full_df, .x))
 
-# name each grouping var output to its sheet name
-results_named <- set_names(results, output_sheet_names)
+# # name each grouping var output to its sheet name
+# results_named <- set_names(results, output_sheet_names)
 
-# add the scrubbed data details 
-results_named[["Data Details"]] <- full_df_scrubbed
+# # add the scrubbed data details 
+# results_named[["Data Details"]] <- full_df_scrubbed
 
-# name the output excel file
-output_name <- paste0("outputs/Internal Fill Rate ", start_date, " to ", end_date, ".xlsx")
+# # name the output excel file
+# output_name <- paste0("outputs/Internal Fill Rate ", start_date, " to ", end_date, ".xlsx")
 ```
 
 
@@ -283,7 +286,7 @@ monthly_results_named <- set_names(monthly_results, output_sheet_names)
 monthly_results_named[["Data Details"]] <- full_df_scrubbed
 
 # name the output excel file
-output_name <- paste0("output/Internal Fill Rate Monthly ", start_date, " to ", end_date, ".xlsx")
+output_name <- paste0("outputs/Internal Fill Rate Monthly ", start_date, " to ", end_date, ".xlsx")
 ```
 
 ```{r}
@@ -292,24 +295,24 @@ library(openxlsx)
 
 wb <- createWorkbook()
 
-for (sheet_name in names(results_named)) {
+for (sheet_name in names(monthly_results_named)) {
   addWorksheet(wb, sheet_name)
-  writeDataTable(wb, sheet = sheet_name, x = results_named[[sheet_name]], tableStyle = "TableStyleMedium2")
+  writeDataTable(wb, sheet = sheet_name, x = monthly_results_named[[sheet_name]], tableStyle = "TableStyleMedium2")
   
   # Get the column index for "Internal Fill Rate"
-  internal_fill_rate_col <- which(names(results_named[[sheet_name]]) == "Internal Fill Rate")
+  internal_fill_rate_col <- which(names(monthly_results_named[[sheet_name]]) == "Internal Fill Rate")
   
   # Apply percentage format to the "Internal Fill Rate" column
   if (length(internal_fill_rate_col) > 0) {
     addStyle(wb, sheet = sheet_name, 
              style = createStyle(numFmt = "0%"), 
              cols = internal_fill_rate_col, 
-             rows = 2:(nrow(results_named[[sheet_name]]) + 1), 
+             rows = 2:(nrow(monthly_results_named[[sheet_name]]) + 1), 
              gridExpand = TRUE)
   }
 }
 
-# saveWorkbook(wb, output_name, overwrite = TRUE)
+saveWorkbook(wb, output_name, overwrite = TRUE)
 ```
 
 ### Validation Checks
@@ -337,15 +340,15 @@ qa_change_dates_same |>
 
 ```{r}
 # create data validation file
-# writexl::write_xlsx(
-#   list(
-#     "New Profile No Move" = full_df_scrubbed |> 
-#          filter(is.na(effective_date)),
-#     "Promo or Lateral No New Profile" = qa_change_dates_same |> 
-#          filter(str_detect(business_process_reason, "Promotion") | 
-#                              str_detect(business_process_reason, "Lateral"))
-#     ), 
-#   "outputs/Internal Fill Data Validation.xlsx"
-# )
+writexl::write_xlsx(
+  list(
+    "New Profile No Move" = full_df_scrubbed |> 
+         filter(is.na(effective_date)),
+    "Promo or Lateral No New Profile" = qa_change_dates_same |> 
+         filter(str_detect(business_process_reason, "Promotion") | 
+                             str_detect(business_process_reason, "Lateral"))
+    ), 
+  "outputs/Internal Fill Data Validation.xlsx"
+)
 ```
 
