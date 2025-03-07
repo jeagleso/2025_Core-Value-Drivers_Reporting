@@ -1,0 +1,68 @@
+---
+title: "Untitled"
+format: html
+---
+
+
+```{r}
+library(tidyverse)
+
+grouping_vars <- list(NULL, 
+                      c("segment_function", "division_function"), 
+                      c("segment_function", "division_function", "business_unit_sub_function"),
+                      c("segment_function", "division_function", "location"),
+                      "career_level_bucket")
+
+output_sheet_names <- c("IPS", 
+                        "Division",
+                        "Division by Subfunction",
+                        "Division by Location",
+                        "By Level")
+
+active <- readxl::read_xlsx("inputs/People Analytics - Active.xlsx", skip = 12) |> 
+    janitor::clean_names() |> 
+    mutate(career_level_bucket = factor(case_when(
+    career_level %in% c("E2", "E3", "E4", "E5") ~ "VP",
+    career_level %in% c("M5", "E1") ~ "Director",
+    career_level %in% c("M2", "M3", "M4") ~ "Manager",
+    career_level == "M1" ~ "Supervisor",
+    career_level %in% c("P1", "P2", "P3", "P4", "P5", "P6") ~ "Professional",
+    career_level %in% c("AT1", "AT2", "AT3", "AT4") ~ "Administrative_Technical",
+    is.na(career_level) ~ "DL_IDL",
+    TRUE ~ "ERROR_unmapped_level"),
+    levels = c("VP", "Director", "Manager", "Supervisor", "Professional", "Administrative_Technical", "DL_IDL", "ERROR_unmapped_level"),
+    ordered = TRUE))
+
+df <- active |> 
+    mutate(draft_complete = case_when(
+        draft_order == 0 ~ "Incomplete",
+        TRUE ~ "Complete"
+    ))
+
+ips <- df |> 
+    filter(management_chain_level_2 == "Jerry Morton") |> 
+    filter(career_level_bucket != "DL_IDL")
+
+calculate_draft_rank_completion <- function(df = ips, grouping_var) {
+    df |> 
+        group_by(across(all_of(grouping_var)), draft_complete) |> 
+        summarize(count = n(), .groups = "drop_last") |> 
+        group_by(across(all_of(grouping_var))) |> 
+        complete(draft_complete = c("Complete", "Incomplete"), 
+             fill = list(count = 0)) |>  
+        mutate(total = sum(count),
+           completion_rate = round(count / total, 4)) |> 
+        ungroup() |> 
+        filter(draft_complete == "Complete") |> 
+        arrange(desc(completion_rate)) |> 
+        select(-draft_complete)
+}
+
+
+draft_order_completion <- map(grouping_vars, ~ calculate_draft_rank_completion(ips, .x)) |> 
+    set_names(output_sheet_names)
+
+draft_order_completion
+
+writexl::write_xlsx(draft_order_completion, "outputs/ips_aip/draft_order_completion.xlsx")
+```
