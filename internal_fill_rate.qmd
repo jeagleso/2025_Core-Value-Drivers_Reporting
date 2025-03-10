@@ -344,9 +344,9 @@ writexl::write_xlsx(
   list(
     "New Profile No Move" = full_df_scrubbed |> 
          filter(is.na(effective_date)),
-    "Promo or Lateral No New Profile" = qa_change_dates_same |> 
-         filter(str_detect(business_process_reason, "Promotion") | 
-                             str_detect(business_process_reason, "Lateral"))
+    "Change No New Profile" = qa_change_dates_same |> 
+         filter(!str_detect(business_process_reason, "Hire Employee")) |> 
+          filter(business_process_type != "Promote Employee Inbound")
     ), 
   "outputs/Internal Fill Data Validation.xlsx"
 )
