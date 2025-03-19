@@ -60,7 +60,7 @@ vt_df_py <- bind_rows(vt_data_py) |>
 # bring together current and previous year
 df <- vt_df |> 
     bind_rows(vt_df_py) |> 
-    mutate(year = year(last_date)) |> 
+    mutate(year = as.factor(year(last_date))) |> 
     mutate(month = month(last_date, label = TRUE, abbr = TRUE)) |> 
     arrange(year, month) |> 
     select(sheet, everything(), -Enterprise)
@@ -76,7 +76,7 @@ df_mom <- df |>
             "green", "blue"))
 
 df_mom |> 
-    ggplot(aes(x = month, y = voluntary_turnover, group = year)) +
+    ggplot(aes(x = month, y = voluntary_turnover, group = year, color = year)) +
     geom_line() +
     geom_point() +
     scale_fill_identity() +
