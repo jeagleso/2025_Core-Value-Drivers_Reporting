@@ -1,0 +1,85 @@
+---
+title: "Untitled"
+format: html
+---
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+
+cvd_goal_vt <- 0.096
+```
+
+
+```{r}
+# get data from output files
+
+# current year
+# output file name for VT CVD
+vt_output_name <- paste0("outputs/Professional Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
+
+# get sheet names
+vt_sheet_names <- excel_sheets(vt_output_name)
+
+# only get sheet names with metrics, not headcount or term sheets
+vt_sheet_names <- vt_sheet_names[1:6]
+
+# pull in each of the sheets
+vt_data <- vt_sheet_names |> 
+    map(~ read_excel(vt_output_name, sheet = .x) |> 
+    mutate(sheet = .x))
+
+# bind together into one df
+vt_df <- bind_rows(vt_data) |> 
+    mutate(last_date = as.Date(paste0("2025-", 
+            match(date, month.abb), "-01")) 
+            %m+% months(1) - days(1))
+
+# previous year
+# output file name for PY 
+vt_output_name_py <- "outputs/Professional Voluntary Turnover Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
+
+# get sheet names
+vt_sheet_names_py <- excel_sheets(vt_output_name_py)
+
+# only get sheet names with metrics, not headcount or term sheets
+vt_sheet_names_py <- vt_sheet_names_py[1:6]
+
+# pull in each of the sheets
+vt_data_py <- vt_sheet_names_py |> 
+    map(~ read_excel(vt_output_name_py, sheet = .x) |> 
+    mutate(sheet = .x))
+
+# bind together
+vt_df_py <- bind_rows(vt_data_py) |> 
+    mutate(last_date = as.Date(paste0("2024-", 
+            match(date, month.abb), "-01")) 
+            %m+% months(1) - days(1))
+
+# bring together current and previous year
+df <- vt_df |> 
+    bind_rows(vt_df_py) |> 
+    mutate(year = year(last_date)) |> 
+    mutate(month = month(last_date, label = TRUE, abbr = TRUE)) |> 
+    arrange(year, month) |> 
+    select(sheet, everything(), -Enterprise)
+```
+
+
+```{r}
+# historical MoM performance
+df_mom <- df |> 
+    filter(sheet == "Enterprise" &
+            date != "YTD") |> 
+    mutate(color = if_else(last_date == max(last_date), 
+            "green", "blue"))
+
+df_mom |> 
+    ggplot(aes(x = month, y = voluntary_turnover, group = year)) +
+    geom_line() +
+    geom_point() +
+    scale_fill_identity() +
+    geom_hline(yintercept = cvd_goal_vt / 12, color = "gray") +
+    theme_minimal()
+```
