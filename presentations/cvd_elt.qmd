@@ -32,6 +32,7 @@ vt_data <- vt_sheet_names |>
 
 # bind together into one df
 vt_df <- bind_rows(vt_data) |> 
+    mutate(year = "2025") |> 
     mutate(last_date = as.Date(paste0("2025-", 
             match(date, month.abb), "-01")) 
             %m+% months(1) - days(1))
@@ -53,6 +54,7 @@ vt_data_py <- vt_sheet_names_py |>
 
 # bind together
 vt_df_py <- bind_rows(vt_data_py) |> 
+    mutate(year = "2024") |> 
     mutate(last_date = as.Date(paste0("2024-", 
             match(date, month.abb), "-01")) 
             %m+% months(1) - days(1))
@@ -60,7 +62,14 @@ vt_df_py <- bind_rows(vt_data_py) |>
 # bring together current and previous year
 df <- vt_df |> 
     bind_rows(vt_df_py) |> 
-    mutate(year = as.factor(year(last_date))) |> 
+    mutate(seg_name = case_when(
+            segment_function == "Automation and Motion Control (AMC)" ~ "AMC",
+            segment_function == "Industrial Powertrain Solutions (IPS)" ~ "IPS",
+            segment_function == "Power Efficiency Solutions (PES)" ~ "PES",
+            segment_function == "Corporate" ~ "Corporate",
+            TRUE ~ NA
+    )) |> 
+    mutate(year = as.factor(year)) |> 
     mutate(month = month(last_date, label = TRUE, abbr = TRUE)) |> 
     arrange(year, month) |> 
     select(sheet, everything(), -Enterprise)
@@ -84,5 +93,34 @@ df_mom |>
         geom_line(aes(color = year)) +
         geom_point(aes(color = year)) +
         scale_fill_identity() +
+        theme_minimal() +
+        labs(title = "MoM Prof+ Voluntary Turnover vs. Goal", 
+            x = "Month",
+            y = "",
+            color = "Year")
+```
+
+
+```{r}
+# segments annualized YTD
+
+df_seg_ytd <- df |> 
+    filter(sheet %in% c("Enterprise", "Segment")) |> 
+    filter(date == "YTD") |> 
+    mutate(seg_name = replace_na(seg_name, "Enterprise")) |> 
+    arrange(desc(seg_name == "Enterprise"), ytd_annualized) |> 
+    mutate(seg_name = factor(seg_name, levels = unique(seg_name)))
+
+df_seg_ytd |> 
+    ggplot(aes(x = seg_name)) +
+    # 10% improvement from 2024
+        geom_bar(data = df_seg_ytd |> filter(year == "2024"),
+            aes(y = ytd_annualized * 0.9), 
+            stat = "identity", fill = "lightgray", width = 0.8) +    
+    # 2025 annualized
+        geom_bar(data = df_seg_ytd |> filter(year == "2025"), 
+            aes(y = ytd_annualized), 
+            stat = "identity", fill = "blue", width = 0.6) +
         theme_minimal()
+        
 ```
