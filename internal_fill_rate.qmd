@@ -41,48 +41,22 @@ format: html
 -   Pulls in when job profile start date and effective date on worker changes report are the same
 
 ```{r}
+#| label: set_up
+
 library(tidyverse)
 
-#| label: set_up
+# read in helper functions
+source("helper_functions.R")
 
 # specify period: first date of current year and last day of previous month
 start_date <- as.Date(floor_date(Sys.Date(), "year"))
 end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
+```
 
+```{r}
 # for 2024
 # start_date <- as.Date("2024-01-01")
 # end_date <- as.Date("2024-12-31")
-
-# define filters to get target population
-# supervisor+
-# employees only no contingent
-# remove HR
-apply_filters <- function(df) {
-  df |> 
-    filter(!str_detect(career_level, "AT") & !str_detect(career_level, "P") & 
-           !is.na(career_level)) |> 
-    filter(worker_type == "Employee") |> 
-    filter(job_family_group != "Human Resources")
-}
-
-# set the grouping variables of interest
-# if changing grouping variables, also add output_sheet_name
-grouping_vars <- list(NULL, 
-                      "segment_function", 
-                      c("segment_function", "division_function"), 
-                      c("segment_function", "division_function", "business_unit_sub_function"),
-                      c("segment_function", "division_function", "location"),
-                      c("segment_function", "career_level_bucket"),
-                      "career_level_bucket")
-
-# set name for output sheet name for each grouping variable
-output_sheet_names <- c("Enterprise",
-                        "Segment",
-                        "Segment by Division",
-                        "Division by Subfunction",
-                        "Division by Location",
-                        "Segment by Level",
-                        "Enterprise by Level")
 
 # check if the number of grouping variables matches the number of sheet names
 if (length(grouping_vars) != length(output_sheet_names)) {
@@ -102,17 +76,7 @@ file_path_pa_at <- "inputs/People Analytics - AT.xlsx"
 df_pa_at <- readxl::read_xlsx(file_path_pa_at, skip = 4) |> 
   janitor::clean_names() |>
   mutate(time_in_job_profile_start_date = as.Date(time_in_job_profile_start_date)) |> 
-  mutate(career_level_bucket = factor(case_when(
-    career_level %in% c("E2", "E3", "E4", "E5") ~ "VP",
-    career_level %in% c("M5", "E1") ~ "Director",
-    career_level %in% c("M2", "M3", "M4") ~ "Manager",
-    career_level == "M1" ~ "Supervisor",
-    career_level %in% c("P1", "P2", "P3", "P4", "P5", "P6") ~ "Professional",
-    career_level %in% c("AT1", "AT2", "AT3", "AT4") ~ "Administrative_Technical",
-    is.na(career_level) ~ "None",
-    TRUE ~ "ERROR_unmapped_level"),
-    levels = c("VP", "Director", "Manager", "Supervisor", "Professional", "Administrative_Technical", "None", "ERROR_unmapped_level"),
-    ordered = TRUE)) |>
+  add_buckets() |>
   mutate(internal_external = case_when(
     hire_date == time_in_job_profile_start_date ~ "External",
     hire_date < time_in_job_profile_start_date ~ "Internal",
@@ -163,7 +127,9 @@ worker_changes <- df_worker_changes |>
 full_df <- pa_at |> 
   left_join(worker_changes, by = join_by("employee_id", 
                                          "time_in_job_profile_start_date" == "effective_date")) |> 
-  apply_filters()
+  apply_general_filters() |> 
+  filter(!str_detect(career_level, "AT") & !str_detect(career_level, "P") & 
+            !is.na(career_level))
 
 # validation: check if many-to-many caused from multiple moves
 qa_multiple_moves <- full_df %>%
@@ -176,7 +142,6 @@ if (nrow(qa_multiple_moves) > 0) {
   stop("At least one person has multiple moves on same effective date.")
 }
 ```
-
 
 
 ```{r}
@@ -194,84 +159,6 @@ full_df_scrubbed <- full_df |>
          new_job_profile, new_career_level, new_comp_grade) |> 
   mutate_at(vars(contains("date")), as.Date) |> 
   arrange(time_in_job_profile_start_date)
-```
-
-
-```{r}
-#| label: function_calculate_internal_fill
-
-# create function for internal fill calculation using df and running for each grouping_var
-calculate_internal_fill <- function(df = full_df, grouping_var) {
-  df <- df |> 
-    group_by(across(all_of(grouping_var)), internal_external) |> 
-    summarize(count = n(), .groups = "drop_last") |> 
-    group_by(across(all_of(grouping_var))) |> 
-    complete(internal_external = c("Internal", "External"), 
-             fill = list(count = 0)) |>  
-    mutate(total = sum(count),
-           fill_rate = round(count / total, 4)) |> 
-    ungroup() |> 
-    filter(internal_external == "Internal") |> 
-    arrange(desc(total)) |> 
-    select(-internal_external) |> 
-    rename('Roles Filled Internally' = count,
-           'Total Filled Roles' = total,
-           'Internal Fill Rate' = fill_rate)
-  return(df)
-}
-```
-
-```{r}
-#| label: function_calculate_internal_fill_monthly
-
-# create function for internal fill calculation using df and running for each grouping_var by each month
-calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
-  df <- df |> 
-    mutate(month = as.Date(floor_date(time_in_job_profile_start_date, "month"))) |> 
-    group_by(across(all_of(grouping_var)), month, internal_external) |> 
-    summarize(count = n(), .groups = "drop_last") |> 
-    group_by(across(all_of(grouping_var)), month) |> 
-    complete(internal_external = c("Internal", "External"), 
-             fill = list(count = 0)) |>  
-    mutate(total = sum(count),
-           fill_rate = round(count / total, 4)) |> 
-    ungroup() |> 
-    filter(internal_external == "Internal") |> 
-    arrange(month) |> 
-    select(-internal_external) 
-
-  ytd <- df |> 
-    group_by(across(all_of(grouping_var))) |> 
-    summarize(count = sum(count),
-              total = sum(total),
-              fill_rate = count / total, .groups = "drop_last") |> 
-    mutate(month = "ytd")
-    
-  binded_df <- df |> 
-    mutate(month = as.character(month)) |> 
-    bind_rows(ytd) |> 
-    rename('Roles Filled Internally' = count,
-           'Total Filled Roles' = total,
-           'Internal Fill Rate' = fill_rate)
-  
-  return(binded_df)
-}
-```
-
-```{r}
-#| label: get_output
-
-# run IFR function for each grouping variable
-# results <- map(grouping_vars, ~ calculate_internal_fill(full_df, .x))
-
-# # name each grouping var output to its sheet name
-# results_named <- set_names(results, output_sheet_names)
-
-# # add the scrubbed data details 
-# results_named[["Data Details"]] <- full_df_scrubbed
-
-# # name the output excel file
-# output_name <- paste0("outputs/Internal Fill Rate ", start_date, " to ", end_date, ".xlsx")
 ```
 
 

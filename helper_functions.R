@@ -139,3 +139,36 @@ read_and_combine <- function(directory_path, row_skip) {
   return(combined_data)
 }
 
+# calculate internal fill
+# create function for internal fill calculation using df and running for each grouping_var by each month
+calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
+  df <- df |> 
+    mutate(month = as.Date(floor_date(time_in_job_profile_start_date, "month"))) |> 
+    group_by(across(all_of(grouping_var)), month, internal_external) |> 
+    summarize(count = n(), .groups = "drop_last") |> 
+    group_by(across(all_of(grouping_var)), month) |> 
+    complete(internal_external = c("Internal", "External"), 
+             fill = list(count = 0)) |>  
+    mutate(total = sum(count),
+           fill_rate = round(count / total, 4)) |> 
+    ungroup() |> 
+    filter(internal_external == "Internal") |> 
+    arrange(month) |> 
+    select(-internal_external) 
+
+  ytd <- df |> 
+    group_by(across(all_of(grouping_var))) |> 
+    summarize(count = sum(count),
+              total = sum(total),
+              fill_rate = count / total, .groups = "drop_last") |> 
+    mutate(month = "ytd")
+    
+  binded_df <- df |> 
+    mutate(month = as.character(month)) |> 
+    bind_rows(ytd) |> 
+    rename('Roles Filled Internally' = count,
+           'Total Filled Roles' = total,
+           'Internal Fill Rate' = fill_rate)
+  
+  return(binded_df)
+}
