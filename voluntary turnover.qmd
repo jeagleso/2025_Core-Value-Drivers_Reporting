@@ -25,6 +25,9 @@ To run for 2024 update:
 #| warning: false
 library(tidyverse)
 
+# read in helper functions
+source("helper_functions.R")
+
 # specify period: first date of current year and last day of previous month
 start_date <- as.Date(floor_date(Sys.Date(), "year"))
 end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
@@ -44,31 +47,31 @@ monthly_data <- tibble(last_day_of_month = as.Date(last_day_of_month))
 
 # filters to be applied
 # filter() does not include NA by default
-apply_filters <- function(df) {
-  df |>  
-    filter(worker_type == "Employee") |> 
-    filter((job_family_group != "Human Resources") |> replace_na(TRUE)) |> 
-    filter(segment_function != "Industrial Systems")
-}
+# apply_filters <- function(df) {
+#   df |>  
+#     filter(worker_type == "Employee") |> 
+#     filter((job_family_group != "Human Resources") |> replace_na(TRUE)) |> 
+#     filter(segment_function != "Industrial Systems")
+# }
 
 # set the grouping variables of interest
 # if changing grouping variables, also add output_sheet_name
-grouping_vars <- list(NULL, 
-                      "segment_function", 
-                      c("segment_function", "division_function"), 
-                      c("segment_function", "division_function", "business_unit_sub_function"),
-                      c("segment_function", "division_function", "location"),
-                      c("segment_function", "career_level_bucket"),
-                      "career_level_bucket")
+# grouping_vars <- list(NULL, 
+#                       "segment_function", 
+#                       c("segment_function", "division_function"), 
+#                       c("segment_function", "division_function", "business_unit_sub_function"),
+#                       c("segment_function", "division_function", "location"),
+#                       c("segment_function", "career_level_bucket"),
+#                       "career_level_bucket")
 
 # set name for output sheet name for each grouping variable
-output_sheet_names <- c("Enterprise",
-                        "Segment",
-                        "Segment by Division",
-                        "Division by Subfunction",
-                        "Division by Location",
-                        "Segment by Level",
-                        "Enterprise by Level")
+# output_sheet_names <- c("Enterprise",
+#                         "Segment",
+#                         "Segment by Division",
+#                         "Division by Subfunction",
+#                         "Division by Location",
+#                         "Segment by Level",
+#                         "Enterprise by Level")
 ```
 
 ```{r}
@@ -77,92 +80,83 @@ output_sheet_names <- c("Enterprise",
 # get active and terminated, add career_level bucket
 active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 4) |> 
   janitor::clean_names() |> 
-  mutate(career_level_bucket = factor(case_when(
-    career_level %in% c("E2", "E3", "E4", "E5") ~ "VP",
-    career_level %in% c("M5", "E1") ~ "Director",
-    career_level %in% c("M2", "M3", "M4") ~ "Manager",
-    career_level == "M1" ~ "Supervisor",
-    career_level %in% c("P1", "P2", "P3", "P4", "P5", "P6") ~ "Professional",
-    career_level %in% c("AT1", "AT2", "AT3", "AT4") ~ "Administrative_Technical",
-    is.na(career_level) ~ "DL_IDL",
-    TRUE ~ "ERROR_unmapped_level"),
-    levels = c("VP", "Director", "Manager", "Supervisor", "Professional", "Administrative_Technical", "DL_IDL", "ERROR_unmapped_level"),
-    ordered = TRUE))
+  add_buckets()
 
 # apply generic filters
 # run once with all except DL/IDL and one with only DL/IDL
 pa_at <- active_and_terminated |> 
-  apply_filters() |> 
+  apply_general_filters() 
+  # |> 
   # filter(career_level_bucket != "DL_IDL")
- filter(career_level_bucket == "DL_IDL")
+#  filter(career_level_bucket == "DL_IDL")
 ```
 
 ```{r}
 #| label: calculate_turnover_at_file
 
-calculate_voluntary_turnover_monthly <- function(grouping_var) {
+# calculate_voluntary_turnover_monthly <- function(grouping_var) {
   
-  # allows join for NULL aka enterprise
-  if (is.null(grouping_var)) {
-    grouping_var <- "Enterprise"
-    pa_at <- pa_at |> mutate(Enterprise = "Enterprise")
-  }
+#   # allows join for NULL aka enterprise
+#   if (is.null(grouping_var)) {
+#     grouping_var <- "Enterprise"
+#     pa_at <- pa_at |> mutate(Enterprise = "Enterprise")
+#   }
 
-  # for each date in last_day_of_month do this function
-  monthly_results <- map_df(last_day_of_month, function(date) {
+#   # for each date in last_day_of_month do this function
+#   monthly_results <- map_df(last_day_of_month, function(date) {
   
-  # get monthly headcount inclusive
-  headcount <- pa_at |> 
-    filter(hire_date <= date & (is.na(termination_date) | termination_date >= date)) |> 
-    group_by(across(all_of(grouping_var))) |> 
-    summarize(headcount = n(), .groups = 'drop')
+#   # get monthly headcount inclusive
+#   headcount <- pa_at |> 
+#     filter(hire_date <= date & (is.na(termination_date) | termination_date >= date)) |> 
+#     group_by(across(all_of(grouping_var))) |> 
+#     summarize(headcount = n(), .groups = 'drop')
   
-  # get monthly voluntary terminations
-  voluntary_terminations <- pa_at |> 
-    filter(termination_category == "Terminate Employee > Voluntary" &
-          termination_date >= floor_date(date, "month") &
-          termination_date <= date) |> 
-    group_by(across(all_of(grouping_var))) |> 
-    summarize(voluntary_terminations = n(), .groups = 'drop')
+#   # get monthly voluntary terminations
+#   voluntary_terminations <- pa_at |> 
+#     filter(termination_category == "Terminate Employee > Voluntary" &
+#           termination_date >= floor_date(date, "month") &
+#           termination_date <= date) |> 
+#     group_by(across(all_of(grouping_var))) |> 
+#     summarize(voluntary_terminations = n(), .groups = 'drop')
 
-  # combine headcount and VTs, calculate voluntary turnover
-  result <- left_join(headcount, voluntary_terminations, by = grouping_var) |> 
-    mutate(
-      date = month(date, label = TRUE),
-      voluntary_terminations = coalesce(voluntary_terminations, 0), # returns 0 if none
-      voluntary_turnover = round(voluntary_terminations / headcount, 4)
-      )
+#   # combine headcount and VTs, calculate voluntary turnover
+#   result <- left_join(headcount, voluntary_terminations, by = grouping_var) |> 
+#     mutate(
+#       date = month(date, label = TRUE),
+#       voluntary_terminations = coalesce(voluntary_terminations, 0), # returns 0 if none
+#       voluntary_turnover = round(voluntary_terminations / headcount, 4)
+#       )
   
-  return(result)
-})
+#   return(result)
+# })
 
- # calculate YTD turnover
-  ytd_results <- monthly_results |> 
-    group_by(across(all_of(grouping_var))) |> 
-    summarize(
-      voluntary_terminations = sum(voluntary_terminations),
-      headcount = mean(headcount, na.rm = TRUE),
-      voluntary_turnover = round(voluntary_terminations / headcount, 4),
-      .groups = 'drop'
-    ) |> 
-    mutate(
-      date = "YTD",
-      ytd_annualized = round(voluntary_turnover * (12 / length(last_day_of_month)), 4)
-    )
+#  # calculate YTD turnover
+#   ytd_results <- monthly_results |> 
+#     group_by(across(all_of(grouping_var))) |> 
+#     summarize(
+#       voluntary_terminations = sum(voluntary_terminations),
+#       headcount = mean(headcount, na.rm = TRUE),
+#       voluntary_turnover = round(voluntary_terminations / headcount, 4),
+#       .groups = 'drop'
+#     ) |> 
+#     mutate(
+#       date = "YTD",
+#       ytd_annualized = round(voluntary_turnover * (12 / length(last_day_of_month)), 4)
+#     )
   
-  # combine monthly and YTD results
-  final_results <- bind_rows(
-    monthly_results |> mutate(date = as.character(date)),
-    ytd_results
-  )
+#   # combine monthly and YTD results
+#   final_results <- bind_rows(
+#     monthly_results |> mutate(date = as.character(date)),
+#     ytd_results
+#   )
   
-  return(final_results)
-}
+#   return(final_results)
+# }
 ```
 
 ```{r}
 # get results for all grouping variable combinations
-monthly_turnover_data <- map(grouping_vars, ~ calculate_voluntary_turnover_monthly(.x)) |> 
+monthly_turnover_data <- map(grouping_vars, ~ calculate_voluntary_turnover_monthly(pa_at, type = "prof", .x)) |> 
   set_names(output_sheet_names)
 ```
 
@@ -210,7 +204,7 @@ library(openxlsx)
 # name the output excel file for professional
 # output_name <- paste0("outputs/Professional Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
 # name the output excel file for manufacturing
-output_name <- paste0("outputs/Manufacturing Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
+output_name <- paste0("outputs/Professional Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
 
 wb <- createWorkbook()
 
@@ -271,6 +265,10 @@ write.csv(ips_aip_hipo, paste0("outputs/ips_aip/", output_ips_hipo),
   row.names = FALSE)
 ```
 
+```{r}
+# special IPS AIP rank order completion
+
+```
 
 FAQ:
 
