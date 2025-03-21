@@ -1,6 +1,5 @@
 # General
 
-
 library(tidyverse)
 
 apply_general_filters <- function(df) {
@@ -142,7 +141,9 @@ read_and_combine <- function(directory_path, row_skip) {
 # calculate internal fill
 # create function for internal fill calculation using df and running for each grouping_var by each month
 calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
-  df <- df |> 
+
+  # calculate internal fill by month
+  df_month <- df |> 
     mutate(month = as.Date(floor_date(time_in_job_profile_start_date, "month"))) |> 
     group_by(across(all_of(grouping_var)), month, internal_external) |> 
     summarize(count = n(), .groups = "drop_last") |> 
@@ -156,15 +157,34 @@ calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
     arrange(month) |> 
     select(-internal_external) 
 
-  ytd <- df |> 
+  # do  the same calculation by quarter
+  quarterly <- df |> 
+    mutate(quarter_num = quarter(time_in_job_profile_start_date, "quarter")) |> 
+    group_by(across(all_of(grouping_var)), quarter_num, internal_external) |> 
+    summarize(count = n(), .groups = "drop_last") |> 
+    group_by(across(all_of(grouping_var)), quarter_num) |> 
+    complete(internal_external = c("Internal", "External"), 
+             fill = list(count = 0)) |>  
+    mutate(total = sum(count),
+           fill_rate = round(count / total, 4)) |> 
+    ungroup() |> 
+    filter(internal_external == "Internal") |> 
+    arrange(quarter_num) |> 
+    select(-internal_external) |> 
+    mutate(month = paste0("Q", quarter_num))
+
+  # group together the months (aka group by grouping_var) to get YTD
+  ytd <- df_month |> 
     group_by(across(all_of(grouping_var))) |> 
     summarize(count = sum(count),
               total = sum(total),
               fill_rate = count / total, .groups = "drop_last") |> 
     mutate(month = "ytd")
-    
-  binded_df <- df |> 
+  
+  # bind quarterly and ytd to month data
+  binded_df <- df_month |> 
     mutate(month = as.character(month)) |> 
+    bind_rows(quarterly) |> 
     bind_rows(ytd) |> 
     rename('Roles Filled Internally' = count,
            'Total Filled Roles' = total,
@@ -172,3 +192,4 @@ calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
   
   return(binded_df)
 }
+
