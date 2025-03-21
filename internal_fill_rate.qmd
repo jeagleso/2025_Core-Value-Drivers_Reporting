@@ -51,13 +51,25 @@ source("helper_functions.R")
 # specify period: first date of current year and last day of previous month
 start_date <- as.Date(floor_date(Sys.Date(), "year"))
 end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
-```
 
-```{r}
 # for 2024
 # start_date <- as.Date("2024-01-01")
 # end_date <- as.Date("2024-12-31")
 
+# file path for active and terminated
+file_path_pa_at <- "inputs/People Analytics - AT.xlsx"
+
+# file path for 2024
+# file_path_pa_at <- "inputs/People People Analytics - AT 2024.xlsx"
+
+# file path to most recent changes report
+file_path_worker_changes <- "inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes.xlsx"
+
+# file path for 2024
+# file_path_worker_changes <- "inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes_2024.xlsx"
+```
+
+```{r}
 # check if the number of grouping variables matches the number of sheet names
 if (length(grouping_vars) != length(output_sheet_names)) {
   stop("The number of grouping variables and sheet names must be the same.")
@@ -68,9 +80,6 @@ if (length(grouping_vars) != length(output_sheet_names)) {
 
 ```{r}
 #| label: pa_at
-
-# file path for active and terminated
-file_path_pa_at <- "inputs/People Analytics - AT.xlsx"
 
 # add career_level and internal/external flag
 df_pa_at <- readxl::read_xlsx(file_path_pa_at, skip = 4) |> 
@@ -96,9 +105,6 @@ pa_at <- df_pa_at |>
 
 ```{r}
 #| label: worker_changes
-
-# file path to most recent changes report
-file_path_worker_changes <- "inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes.xlsx"
 
 # read in worker changes
 df_worker_changes_raw <- readxl::read_xlsx(file_path_worker_changes, skip = 7) |> 
