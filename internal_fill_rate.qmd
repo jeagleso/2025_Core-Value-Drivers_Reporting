@@ -115,7 +115,7 @@ df_worker_changes <- df_worker_changes_raw |>
   group_by(employee_id, effective_date) |> 
   filter(!(n() > 1 & business_process_reason == "Transfer > Transfer > Move to another Manager")) |> 
   ungroup() |> 
-  select(employee_id, effective_date, business_process_type, business_process_reason, 
+  select(employee_id, effective_date, date_initiated, business_process_type, business_process_reason, 
          starts_with("prior_"), starts_with("new_")) 
 
 # remove duplicate row for promotions - both inbound and outbound on report
@@ -160,7 +160,7 @@ full_df_scrubbed <- full_df |>
     TRUE ~ time_in_job_profile_start_date)) |> 
   select(employee_id, worker, hire_date, time_in_job_profile_start_date, internal_external, 
          segment_function, division_function, business_unit_sub_function, location, career_level, 
-         effective_date, business_process_type, business_process_reason, 
+         effective_date, date_initiated, business_process_type, business_process_reason, 
          prior_job_profile, prior_career_level, prior_comp_grade, 
          new_job_profile, new_career_level, new_comp_grade) |> 
   mutate_at(vars(contains("date")), as.Date) |> 
@@ -211,17 +211,20 @@ saveWorkbook(wb, output_name, overwrite = TRUE)
 ### Validation Checks
 
 ```{r}
-# on job changes, not diff profile/hire date
+# promo, lateral move, promo, no new job profile
 # excluding terminations and outbound to remove duplicates 
 qa_change_dates_same <- df_worker_changes_raw |> 
-  filter(business_process_type != "Promote Employee Outbound") |> 
+  filter(business_process_reason %in% c("Demotion > Demotion > Decrease in Responsibility", 
+                                      "Promotion > Promotion > Promotion", 
+                                      "Lateral Move > Lateral Move > Move to another position on my team")) |> 
+  filter(business_process_type != "Promote Employee Inbound") |> 
   filter(!str_detect(new_career_level, "AT") & !str_detect(new_career_level, "P") & 
            !is.na(new_career_level)) |> 
   filter(!str_detect(business_process_reason, "Terminate")) |> 
   anti_join(pa_at, by = "employee_id") |> 
   select(employee_id, worker, 
          segment_function, division_function,
-         effective_date, business_process_type, business_process_reason, 
+         effective_date, date_initiated, business_process_type, business_process_reason, 
          prior_job_profile, prior_career_level, prior_comp_grade, 
          new_job_profile, new_career_level, new_comp_grade)
 
@@ -235,11 +238,13 @@ qa_change_dates_same |>
 # create data validation file
 writexl::write_xlsx(
   list(
-    "New Profile No Move" = full_df_scrubbed |> 
-         filter(is.na(effective_date)),
-    "Change No New Profile" = qa_change_dates_same |> 
+    "New Profile No Transaction" = full_df_scrubbed |> 
+         filter(is.na(effective_date)) |> 
+          select(employee_id:career_level),
+    "ProLatDemo No Profile Change" = qa_change_dates_same |> 
          filter(!str_detect(business_process_reason, "Hire Employee")) |> 
-          filter(business_process_type != "Promote Employee Inbound")
+          filter(business_process_type != "Promote Employee Inbound") |> 
+          arrange(desc(effective_date))
     ), 
   "outputs/Internal Fill Data Validation.xlsx"
 )
