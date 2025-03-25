@@ -90,7 +90,8 @@ calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grou
   # combine headcount and VTs, calculate voluntary turnover
   result <- left_join(headcount, voluntary_terminations, by = grouping_var) |> 
     mutate(
-      date = month(date, label = TRUE),
+      date = date,
+      month = month(date, label = TRUE),
       voluntary_terminations = coalesce(voluntary_terminations, 0), # returns 0 if none
       voluntary_turnover = round(voluntary_terminations / headcount, 4)
       )
@@ -98,6 +99,18 @@ calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grou
   return(result)
 })
 
+# calculate quarterly turnover
+  quarterly_results <- monthly_results |> 
+    mutate(quarter_num = quarter(date, "quarter")) |> 
+    group_by(across(all_of(grouping_var)), quarter_num) |> 
+    summarize(
+      voluntary_terminations = sum(voluntary_terminations),
+      headcount = mean(headcount, na.rm = TRUE),
+      voluntary_turnover = round(voluntary_terminations / headcount, 4),
+      .groups = 'drop'
+    ) |> 
+    mutate(month = paste0("Q", quarter_num))
+  
  # calculate YTD turnover
   ytd_results <- monthly_results |> 
     group_by(across(all_of(grouping_var))) |> 
@@ -108,18 +121,22 @@ calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grou
       .groups = 'drop'
     ) |> 
     mutate(
-      date = "YTD",
+      # date = "YTD",
+      month = "YTD",
       ytd_annualized = round(voluntary_turnover * (12 / length(last_day_of_month)), 4)
     )
   
   # combine monthly and YTD results
   final_results <- bind_rows(
     monthly_results |> mutate(date = as.character(date)),
+    quarterly_results,
     ytd_results
-  )
+  ) |> 
+    select(-date, -quarter_num)
   
   return(final_results)
 }
+
 
 # if you need to read and combine monthly files (e.g., multiple term or headcount files)
 read_and_combine <- function(directory_path, row_skip) {
@@ -192,4 +209,5 @@ calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
   
   return(binded_df)
 }
+
 
