@@ -161,7 +161,8 @@ calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
     ungroup() |> 
     filter(internal_external == "Internal") |> 
     arrange(month) |> 
-    select(-internal_external) 
+    select(-internal_external) |> 
+    mutate(month = month(month, label = TRUE))
 
   # do  the same calculation by quarter
   quarterly <- df |> 
@@ -194,7 +195,8 @@ calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
     bind_rows(ytd) |> 
     rename('Roles Filled Internally' = count,
            'Total Filled Roles' = total,
-           'Internal Fill Rate' = fill_rate)
+           'Internal Fill Rate' = fill_rate) |> 
+    select(-quarter_num)
   
   return(binded_df)
 }

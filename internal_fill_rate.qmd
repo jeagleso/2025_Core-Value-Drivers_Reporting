@@ -158,8 +158,9 @@ full_df_scrubbed <- full_df |>
   mutate(effective_date = case_when(
     is.na(business_process_reason) ~ NA,
     TRUE ~ time_in_job_profile_start_date)) |> 
-  select(employee_id, worker, hire_date, time_in_job_profile_start_date, internal_external, 
+  select(employee_id, worker, hire_date, time_in_job_profile_start_date, internal_external, employee_type,
          segment_function, division_function, business_unit_sub_function, location, career_level, 
+         management_chain_level_2, management_chain_level_3, management_chain_level_4, management_chain_level_5,
          effective_date, date_initiated, business_process_type, business_process_reason, 
          prior_job_profile, prior_career_level, prior_comp_grade, 
          new_job_profile, new_career_level, new_comp_grade) |> 

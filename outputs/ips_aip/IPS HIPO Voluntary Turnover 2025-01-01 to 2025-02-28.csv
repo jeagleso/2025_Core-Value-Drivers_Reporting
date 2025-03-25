@@ -1,4 +1,5 @@
-"headcount","voluntary_terminations","date","voluntary_turnover","ytd_annualized"
-757,3,"Jan",0.004,NA
-754,0,"Feb",0,NA
-755.5,3,"YTD",0.004,0.024
+"headcount","voluntary_terminations","month","voluntary_turnover","ytd_annualized"
+17322,260,"Jan",0.015,NA
+17494,245,"Feb",0.014,NA
+17408,505,"Q1",0.029,NA
+17408,505,"YTD",0.029,0.174
