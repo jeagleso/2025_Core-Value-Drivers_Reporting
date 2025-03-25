@@ -7,43 +7,70 @@ format: html
 ```{r}
 library(tidyverse)
 
-grouping_vars <- list(NULL, 
-                      c("segment_function", "division_function"), 
-                      c("segment_function", "division_function", "business_unit_sub_function"),
-                      c("segment_function", "division_function", "location"),
-                      "career_level_bucket")
+# read in helper functions
+source("helper_functions.R")
 
-output_sheet_names <- c("IPS", 
-                        "Division",
-                        "Division by Subfunction",
-                        "Division by Location",
-                        "By Level")
+# specify period: first date of current year and last day of previous month
+start_date <- as.Date(floor_date(Sys.Date(), "year"))
+end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
 
-active <- readxl::read_xlsx("inputs/People Analytics - Active.xlsx", skip = 12) |> 
-    janitor::clean_names() |> 
-    mutate(career_level_bucket = factor(case_when(
-    career_level %in% c("E2", "E3", "E4", "E5") ~ "VP",
-    career_level %in% c("M5", "E1") ~ "Director",
-    career_level %in% c("M2", "M3", "M4") ~ "Manager",
-    career_level == "M1" ~ "Supervisor",
-    career_level %in% c("P1", "P2", "P3", "P4", "P5", "P6") ~ "Professional",
-    career_level %in% c("AT1", "AT2", "AT3", "AT4") ~ "Administrative_Technical",
-    is.na(career_level) ~ "DL_IDL",
-    TRUE ~ "ERROR_unmapped_level"),
-    levels = c("VP", "Director", "Manager", "Supervisor", "Professional", "Administrative_Technical", "DL_IDL", "ERROR_unmapped_level"),
-    ordered = TRUE))
+# use for 2024 file
+# start_date <- as.Date("2024-01-01")
+# end_date <- as.Date("2024-12-31")
 
-df <- active |> 
-    mutate(draft_complete = case_when(
-        draft_order == 0 ~ "Incomplete",
-        TRUE ~ "Complete"
-    ))
+# get all months included in period
+months_included <- seq(start_date, end_date, by = "month")
 
-ips <- df |> 
-    filter(management_chain_level_2 == "Jerry Morton") |> 
-    filter(career_level_bucket != "DL_IDL")
+# get the last date of each month
+last_day_of_month <- ceiling_date(months_included, "month") - days(1)
 
-calculate_draft_rank_completion <- function(df = ips, grouping_var) {
+# data frame with all months
+monthly_data <- tibble(last_day_of_month = as.Date(last_day_of_month))
+
+# get active and terminated, add career_level bucket
+active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 4) |> 
+  janitor::clean_names() |> 
+  add_buckets()
+```
+
+```{r}
+# special IPS AIP hipo turnover
+output_ips_hipo <- paste0("IPS HIPO Voluntary Turnover ", start_date, " to ", end_date, ".csv")
+
+# add filters for aip metric
+ips_at <- active_and_terminated |>
+  apply_general_filters() |> 
+  filter(career_level_bucket != "DL_IDL") |>  
+  filter(management_chain_level_2 == "Jerry Morton") |> 
+  mutate(draft_complete = case_when(
+        draft_order > 0 ~ "Complete",
+        TRUE ~ "Incomplete"
+  ))
+
+ips_hipo <- ips_at |> 
+    filter(x9box_numeric %in% c("3.3", "3.2", "2.3")) |> 
+    filter(x9box_potential != "Too New To Rate" & 
+            x9box_potential != "New to Company")
+
+# run formula without grouping variable, remove "enterprise" column
+ips_aip_hipo <- calculate_voluntary_turnover_monthly(df = ips_hipo, grouping_var = NULL) |> 
+  select(-Enterprise)
+
+# writ einto ips_aip outputs
+write.csv(ips_aip_hipo, paste0("outputs/ips_aip/", output_ips_hipo), 
+  row.names = FALSE)
+```
+
+
+```{r}
+ips_prof <- ips_at |> 
+    filter(career_level_bucket != "Administrative_Technical") |> 
+    mutate(tenured = case_when(
+        hire_date <= Sys.Date() %m-% months(6) ~ "Yes",
+        TRUE ~ "No")) |> 
+    filter(tenured == "Yes")
+
+calculate_draft_rank_completion <- function(df = ips_at, grouping_var) {
     df |> 
         group_by(across(all_of(grouping_var)), draft_complete) |> 
         summarize(count = n(), .groups = "drop_last") |> 
@@ -57,12 +84,12 @@ calculate_draft_rank_completion <- function(df = ips, grouping_var) {
         arrange(desc(completion_rate)) |> 
         select(-draft_complete)
 }
+```
 
 
-draft_order_completion <- map(grouping_vars, ~ calculate_draft_rank_completion(ips, .x)) |> 
+```{r}
+ips_draft_order_completion <- map(grouping_vars, ~calculate_draft_rank_completion(ips_at, .x)) |> 
     set_names(output_sheet_names)
 
-draft_order_completion
-
-writexl::write_xlsx(draft_order_completion, "outputs/ips_aip/draft_order_completion.xlsx")
+writexl::write_xlsx(ips_draft_order_completion, paste0("outputs/ips_aip/IPS Draft Order Completion ", start_date, " to ", end_date, ".xlsx"))
 ```
