@@ -52,17 +52,7 @@ output_sheet_names <- c("Enterprise",
 #| label: calculate_turnover_at_file
 
 # type is professional or manufacturing
-calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grouping_vars, type = "prof") {
-  
-  if (type == "prof") {
-    pa_at <- pa_at |> 
-      filter(career_level_bucket != "DL_IDL")
-  } else if (type == "manuf") {
-    pa_at <- pa_at |> 
-      filter(career_level_bucket == "DL_IDL")
-  } else {
-    stop("Invalid type. Enter 'prof' or 'manuf'.")
-  }
+calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grouping_vars) {
 
   # allows join for NULL aka enterprise
   if (is.null(grouping_var)) {
