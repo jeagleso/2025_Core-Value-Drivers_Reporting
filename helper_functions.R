@@ -57,20 +57,20 @@ calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grou
   # allows join for NULL aka enterprise
   if (is.null(grouping_var)) {
     grouping_var <- "Enterprise"
-    pa_at <- pa_at |> mutate(Enterprise = "Enterprise")
+    df <- df |> mutate(Enterprise = "Enterprise")
   }
 
   # for each date in last_day_of_month do this function
   monthly_results <- map_df(last_day_of_month, function(date) {
   
   # get monthly headcount inclusive
-  headcount <- pa_at |> 
+  headcount <- df |> 
     filter(hire_date <= date & (is.na(termination_date) | termination_date >= date)) |> 
     group_by(across(all_of(grouping_var))) |> 
     summarize(headcount = n(), .groups = 'drop')
   
   # get monthly voluntary terminations
-  voluntary_terminations <- pa_at |> 
+  voluntary_terminations <- df |> 
     filter(termination_category == "Terminate Employee > Voluntary" &
           termination_date >= floor_date(date, "month") &
           termination_date <= date) |> 
@@ -111,7 +111,6 @@ calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grou
       .groups = 'drop'
     ) |> 
     mutate(
-      # date = "YTD",
       month = "YTD",
       ytd_annualized = round(voluntary_turnover * (12 / length(last_day_of_month)), 4)
     )

@@ -46,7 +46,7 @@ last_day_of_month <- ceiling_date(months_included, "month") - days(1)
 monthly_data <- tibble(last_day_of_month = as.Date(last_day_of_month))
 
 # get active and terminated, add career_level bucket
-active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - Active - EmployeeType.xlsx", skip = 4) |> 
+active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 4) |> 
   janitor::clean_names() |> 
   add_buckets()
 ```
@@ -84,10 +84,11 @@ monthly_headcount <- map_df(last_day_of_month, function(date) {
   headcount <- pa_at |> 
     filter(hire_date <= date & (is.na(termination_date) | termination_date >= date)) |> 
     mutate(date = month(date, label = TRUE)) |> 
-    select(employee_id, worker, hire_date, 
-    termination_date, termination_category, termination_reason, employee_type,
-    segment_function, division_function, business_unit_sub_function, management_chain_level_2,
-    location, career_level, date)
+    select(employee_id, worker, hire_date, employee_type,
+    termination_date, termination_category, termination_reason, 
+    segment_function, division_function, business_unit_sub_function,
+    location, career_level, date, 
+    management_chain_level_2, management_chain_level_3, management_chain_level_4, management_chain_level_5)
 
   return(headcount)
   
@@ -108,10 +109,10 @@ monthly_turnover_data[["Voluntary Terms"]] <- pa_at |>
   filter(termination_category == "Terminate Employee > Voluntary" &
         termination_date >= floor_date(start_date, "month") &
         termination_date <= end_date) |> 
-  select(employee_id, worker, hire_date, 
-  termination_date, termination_category, termination_reason, 
-  segment_function, division_function, business_unit_sub_function, management_chain_level_2,
-  location, career_level) |> 
+  select(employee_id, worker, hire_date, employee_type,
+        termination_date, termination_category, termination_reason, 
+        segment_function, division_function, business_unit_sub_function,
+        location, career_level, management_chain_level_2, management_chain_level_3, management_chain_level_4, management_chain_level_5) |> 
   mutate_at(vars(contains("date")), as.Date)
 ```
 
@@ -144,14 +145,16 @@ saveWorkbook(wb, output_name, overwrite = TRUE)
 output_ips_hipo <- paste0("IPS HIPO Voluntary Turnover ", start_date, " to ", end_date, ".csv")
 
 # add filters for aip metric
-pa_at <- pa_at |> 
+ips_at <- active_and_terminated |>
+  apply_general_filters() |> 
+  filter(career_level_bucket != "DL_IDL") |> 
   filter(x9box_numeric %in% c("3.3", "3.2", "2.3")) |> 
   filter(x9box_potential != "Too New To Rate" & 
-           x9box_potential != "New to Company") |> 
+        x9box_potential != "New to Company") |> 
   filter(management_chain_level_2 == "Jerry Morton")
 
 # run formula without grouping variable, remove "enterprise" column
-ips_aip_hipo <- calculate_voluntary_turnover_monthly(grouping_var = NULL) |> 
+ips_aip_hipo <- calculate_voluntary_turnover_monthly(df = ips_at, grouping_var = NULL) |> 
   select(-Enterprise)
 
 # writ einto ips_aip outputs
