@@ -239,9 +239,11 @@ qa_change_dates_same |>
 # create data validation file
 writexl::write_xlsx(
   list(
-    "New Profile No Transaction" = full_df_scrubbed |> 
-         filter(is.na(effective_date)) |> 
-          select(employee_id:career_level),
+    "New Profile No ProLatDemo" = full_df_scrubbed |> 
+         filter(!business_process_reason %in% c("Demotion > Demotion > Decrease in Responsibility", 
+                                      "Promotion > Promotion > Promotion", 
+                                      "Lateral Move > Lateral Move > Move to another position on my team") | is.na(business_process_reason)) |> 
+        filter(business_process_type != "Hire" | is.na(business_process_type)),
     "ProLatDemo No Profile Change" = qa_change_dates_same |> 
          filter(!str_detect(business_process_reason, "Hire Employee")) |> 
           filter(business_process_type != "Promote Employee Inbound") |> 
