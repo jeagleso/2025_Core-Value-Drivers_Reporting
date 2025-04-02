@@ -49,24 +49,24 @@ library(tidyverse)
 source("helper_functions.R")
 
 # specify period: first date of current year and last day of previous month
-# start_date <- as.Date(floor_date(Sys.Date(), "year"))
-# end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
-
-# for 2024
-start_date <- as.Date("2024-01-01")
-end_date <- as.Date("2024-12-31")
+start_date <- as.Date(floor_date(Sys.Date(), "year"))
+end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
 
 # file path for active and terminated
-# file_path_pa_at <- "inputs/People Analytics - AT.xlsx"
-
-# file path for 2024
-file_path_pa_at <- "inputs/People Analytics - AT 2024.xlsx"
+file_path_pa_at <- "inputs/People Analytics - AT.xlsx"
 
 # file path to most recent changes report
-# file_path_worker_changes <- "inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes.xlsx"
+file_path_worker_changes <- "inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes.xlsx"
+
+# for 2024
+# start_date <- as.Date("2024-01-01")
+# end_date <- as.Date("2024-12-31")
 
 # file path for 2024
-file_path_worker_changes <- "inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes_2024.xlsx"
+# file_path_pa_at <- "inputs/People Analytics - AT 2024.xlsx"
+
+# file path for 2024
+# file_path_worker_changes <- "inputs/RRX_-_Worker_Data_-_Hires_and_Job_Changes_2024.xlsx"
 ```
 
 ```{r}
@@ -236,19 +236,19 @@ qa_change_dates_same |>
 
 ```{r}
 # create data validation file
-# writexl::write_xlsx(
-#   list(
-#     "New Profile No ProLatDemo" = full_df_scrubbed |> 
-#          filter(!business_process_reason %in% c("Demotion > Demotion > Decrease in Responsibility", 
-#                                       "Promotion > Promotion > Promotion", 
-#                                       "Lateral Move > Lateral Move > Move to another position on my team") | is.na(business_process_reason)) |> 
-#         filter(business_process_type != "Hire" | is.na(business_process_type)),
-#     "ProLatDemo No Profile Change" = qa_change_dates_same |> 
-#          filter(!str_detect(business_process_reason, "Hire Employee")) |> 
-#           filter(business_process_type != "Promote Employee Inbound") |> 
-#           arrange(desc(effective_date))
-#     ), 
-#   "outputs/Internal Fill Data Validation.xlsx"
-# )
+writexl::write_xlsx(
+  list(
+    "New Profile No ProLatDemo" = full_df_scrubbed |> 
+         filter(!business_process_reason %in% c("Demotion > Demotion > Decrease in Responsibility", 
+                                      "Promotion > Promotion > Promotion", 
+                                      "Lateral Move > Lateral Move > Move to another position on my team") | is.na(business_process_reason)) |> 
+        filter(business_process_type != "Hire" | is.na(business_process_type)),
+    "ProLatDemo No Profile Change" = qa_change_dates_same |> 
+         filter(!str_detect(business_process_reason, "Hire Employee")) |> 
+          filter(business_process_type != "Promote Employee Inbound") |> 
+          arrange(desc(effective_date))
+    ), 
+  "outputs/Internal Fill Data Validation.xlsx"
+)
 ```
 
