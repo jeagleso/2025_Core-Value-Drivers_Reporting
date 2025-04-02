@@ -152,7 +152,7 @@ calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
   df_month <- df |> 
     mutate(month = as.Date(floor_date(time_in_job_profile_start_date, "month"))) |> 
     group_by(across(all_of(grouping_var)), month, internal_external) |> 
-    summarize(count = n(), .groups = "drop_last") |> 
+    summarize(count = n_distinct(employee_id, effective_date), .groups = "drop_last") |> 
     group_by(across(all_of(grouping_var)), month) |> 
     complete(internal_external = c("Internal", "External"), 
              fill = list(count = 0)) |>  
@@ -168,7 +168,7 @@ calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
   quarterly <- df |> 
     mutate(quarter_num = quarter(time_in_job_profile_start_date, "quarter")) |> 
     group_by(across(all_of(grouping_var)), quarter_num, internal_external) |> 
-    summarize(count = n(), .groups = "drop_last") |> 
+    summarize(count = n_distinct(employee_id, effective_date), .groups = "drop_last") |> 
     group_by(across(all_of(grouping_var)), quarter_num) |> 
     complete(internal_external = c("Internal", "External"), 
              fill = list(count = 0)) |>  

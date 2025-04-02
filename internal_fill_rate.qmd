@@ -137,7 +137,7 @@ full_df <- pa_at |>
   filter(!str_detect(career_level, "AT") & !str_detect(career_level, "P") & 
             !is.na(career_level)) |> 
   rename(employee_id = employee_id.x) |> 
-  select(-employee_id.y)
+  select(-employee_id.y) 
 
 # validation: check if many-to-many caused from multiple moves
 qa_multiple_moves <- full_df %>%
