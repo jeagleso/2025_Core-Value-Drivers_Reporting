@@ -29,12 +29,20 @@ library(tidyverse)
 source("helper_functions.R")
 
 # specify period: first date of current year and last day of previous month
-start_date <- as.Date(floor_date(Sys.Date(), "year"))
-end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
+# start_date <- as.Date(floor_date(Sys.Date(), "year"))
+# end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
+
+# get active and terminated, add career_level bucket
+# active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 4) |> 
+#   janitor::clean_names() |> 
+#   add_buckets()
 
 # use for 2024 file
-# start_date <- as.Date("2024-01-01")
-# end_date <- as.Date("2024-12-31")
+start_date <- as.Date("2024-01-01")
+end_date <- as.Date("2024-12-31")
+active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT 2024.xlsx", skip = 4) |> 
+  janitor::clean_names() |> 
+  add_buckets()
 
 # get all months included in period
 months_included <- seq(start_date, end_date, by = "month")
@@ -44,11 +52,6 @@ last_day_of_month <- ceiling_date(months_included, "month") - days(1)
 
 # data frame with all months
 monthly_data <- tibble(last_day_of_month = as.Date(last_day_of_month))
-
-# get active and terminated, add career_level bucket
-active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 4) |> 
-  janitor::clean_names() |> 
-  add_buckets()
 ```
 
 ```{r}
