@@ -95,7 +95,7 @@ calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grou
     group_by(across(all_of(grouping_var)), quarter_num) |> 
     summarize(
       voluntary_terminations = sum(voluntary_terminations),
-      headcount = mean(headcount, na.rm = TRUE),
+      headcount = round(mean(headcount, na.rm = TRUE), 1),
       voluntary_turnover = round(voluntary_terminations / headcount, 4),
       .groups = 'drop'
     ) |> 
@@ -106,7 +106,7 @@ calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grou
     group_by(across(all_of(grouping_var))) |> 
     summarize(
       voluntary_terminations = sum(voluntary_terminations),
-      headcount = mean(headcount, na.rm = TRUE),
+      headcount = round(mean(headcount, na.rm = TRUE), 1),
       voluntary_turnover = round(voluntary_terminations / headcount, 4),
       .groups = 'drop'
     ) |> 
