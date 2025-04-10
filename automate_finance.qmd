@@ -16,17 +16,49 @@ ifr_prev <- "outputs/Internal Fill Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
 ifr_current <- read_excel_allsheets(filename = ifr_current_path)
 ifr_prev <- read_excel_allsheets(filename = ifr_prev)
 
-column_order <- c("ytd", "Jan", "Feb", "Mar", "Q1", "Apr", "May", "Jun", "Q2", "Jul", "Aug", "Sep", "Q3", "Oct", "Nov", "Dec", "Q4") 
+# column order used by finance
+# use for previous year
+column_order <- c("Jan", "Feb", "Mar", "Q1", "Apr", "May", "Jun", "Q2", "Jul", "Aug", "Sep", "Q3", "Oct", "Nov", "Dec", "Q4") 
 
+# get the current month
 current_month <- month(end_date + 1, label = TRUE, abbr = TRUE)
 
+# get the index of the current month, and take one before (so quarters are included)
 current_month_index <- which(column_order == current_month) - 1
 
+# filter column order to only include current months
+# use for current year
 column_order_dynamic <- column_order[1:current_month_index]
 
 # start with segment
 seg_prev <- ifr_prev$Segment |> 
+    # # temp filter
+    # filter(segment_function == "Corporate") |> 
+    mutate(data_source = "PY Actual") |> 
     select(-`Roles Filled Internally`, -`Total Filled Roles`) |> 
     pivot_wider(names_from = month, values_from = `Internal Fill Rate`) |> 
-    select(where(is.character), column_order)
+    select(where(is.character), "ytd", all_of(column_order))
+
+# get goal that is 10% improvement from previous year
+############ WILL ONLY NEED FOR VT, NOT IFR ##########################
+seg_goal <- seg_prev |> 
+    select(where(is.character), ytd) |> 
+    mutate(goal = ytd * 0.90)
+
+# get goal for each month and quarter
+values <- c(rep(seg_goal / 12, 3), seg_goal / 4, 
+            rep(seg_goal / 12, 3), seg_goal / 4,
+            rep(seg_goal / 12, 3), seg_goal / 4,
+            rep(seg_goal / 12, 3), seg_goal / 4)
+
+seg_current <- ifr_current$Segment |>
+    # temp filter
+    filter(segment_function == "Corporate") |>
+    mutate(data_source = "CY Actual") |> 
+    select(-`Roles Filled Internally`, -`Total Filled Roles`) |> 
+    pivot_wider(names_from = month, values_from = `Internal Fill Rate`) |> 
+    select(where(is.character), "ytd", all_of(column_order_dynamic))
+
+seg <- seg_prev |> 
+    bind_rows(seg_current)
 ```
