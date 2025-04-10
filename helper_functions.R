@@ -126,6 +126,14 @@ calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grou
   return(final_results)
 }
 
+# get all sheets from an excel file
+read_excel_allsheets <- function(filename) {
+  sheets <- readxl::excel_sheets(filename)
+  x <- lapply(sheets, function(X) readxl::read_xlsx(filename, sheet = X))
+  names(x) <- sheets
+  x
+}
+
 
 # if you need to read and combine monthly files (e.g., multiple term or headcount files)
 read_and_combine <- function(directory_path, row_skip) {
