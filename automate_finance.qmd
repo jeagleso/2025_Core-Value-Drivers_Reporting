@@ -1,0 +1,32 @@
+---
+title: "Untitled"
+format: html
+---
+
+
+```{r}
+# read in helper functions
+source("helper_functions.R")
+
+# filepaths
+ifr_current_path <- "outputs/Internal Fill Rate Monthly 2025-01-01 to 2025-03-31.xlsx"
+ifr_prev <- "outputs/Internal Fill Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
+
+# read in current and previous year
+ifr_current <- read_excel_allsheets(filename = ifr_current_path)
+ifr_prev <- read_excel_allsheets(filename = ifr_prev)
+
+column_order <- c("ytd", "Jan", "Feb", "Mar", "Q1", "Apr", "May", "Jun", "Q2", "Jul", "Aug", "Sep", "Q3", "Oct", "Nov", "Dec", "Q4") 
+
+current_month <- month(end_date + 1, label = TRUE, abbr = TRUE)
+
+current_month_index <- which(column_order == current_month) - 1
+
+column_order_dynamic <- column_order[1:current_month_index]
+
+# start with segment
+seg_prev <- ifr_prev$Segment |> 
+    select(-`Roles Filled Internally`, -`Total Filled Roles`) |> 
+    pivot_wider(names_from = month, values_from = `Internal Fill Rate`) |> 
+    select(where(is.character), column_order)
+```
