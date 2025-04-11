@@ -5,6 +5,8 @@ format: html
 
 
 ```{r}
+library(tidyverse)
+
 # read in helper functions
 source("helper_functions.R")
 
@@ -30,7 +32,7 @@ current_month_index <- which(column_order == current_month) - 1
 # use for current year
 column_order_dynamic <- column_order[1:current_month_index]
 
-# start with segment
+# get previous
 seg_prev <- ifr_prev$Segment |> 
     # # temp filter
     # filter(segment_function == "Corporate") |> 
@@ -39,6 +41,32 @@ seg_prev <- ifr_prev$Segment |>
     pivot_wider(names_from = month, values_from = `Internal Fill Rate`) |> 
     select(where(is.character), "ytd", all_of(column_order))
 
+# get goals
+seg_goal <- ifr_prev$Segment |> 
+    select(-`Roles Filled Internally`, -`Total Filled Roles`, -`Internal Fill Rate`) |> 
+    mutate(data_source = "Goal") |> 
+    mutate(Goal = 0.50) |> 
+    pivot_wider(names_from = month, values_from = Goal) |> 
+    select(where(is.character), "ytd", all_of(column_order))
+
+# get current data
+seg_current <- ifr_current$Segment |>
+    # # temp filter
+    # filter(segment_function == "Corporate") |>
+    mutate(data_source = "CY Actual") |> 
+    select(-`Roles Filled Internally`, -`Total Filled Roles`) |> 
+    pivot_wider(names_from = month, values_from = `Internal Fill Rate`) |> 
+    select(where(is.character), "ytd", all_of(column_order_dynamic))
+
+# combine all together
+seg <- seg_prev |> 
+    bind_rows(seg_goal) |> 
+    bind_rows(seg_current)
+
+
+```
+
+```{r}
 # get goal that is 10% improvement from previous year
 ############ WILL ONLY NEED FOR VT, NOT IFR ##########################
 seg_goal <- seg_prev |> 
@@ -46,19 +74,8 @@ seg_goal <- seg_prev |>
     mutate(goal = ytd * 0.90)
 
 # get goal for each month and quarter
-values <- c(rep(seg_goal / 12, 3), seg_goal / 4, 
-            rep(seg_goal / 12, 3), seg_goal / 4,
-            rep(seg_goal / 12, 3), seg_goal / 4,
-            rep(seg_goal / 12, 3), seg_goal / 4)
-
-seg_current <- ifr_current$Segment |>
-    # temp filter
-    filter(segment_function == "Corporate") |>
-    mutate(data_source = "CY Actual") |> 
-    select(-`Roles Filled Internally`, -`Total Filled Roles`) |> 
-    pivot_wider(names_from = month, values_from = `Internal Fill Rate`) |> 
-    select(where(is.character), "ytd", all_of(column_order_dynamic))
-
-seg <- seg_prev |> 
-    bind_rows(seg_current)
+goal_values <- c(rep(seg_goal / 12, 3), seg_goal / 4, 
+                rep(seg_goal / 12, 3), seg_goal / 4,
+                rep(seg_goal / 12, 3), seg_goal / 4,
+                rep(seg_goal / 12, 3), seg_goal / 4)
 ```
