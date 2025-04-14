@@ -12,11 +12,17 @@ source("helper_functions.R")
 
 # filepaths
 ifr_current_path <- "outputs/Internal Fill Rate Monthly 2025-01-01 to 2025-03-31.xlsx"
-ifr_prev <- "outputs/Internal Fill Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
+ifr_prev_path <- "outputs/Internal Fill Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
+
+vt_current_path <- "outputs/Professional Voluntary Turnover Rate Monthly 2025-01-01 to 2025-03-31.xlsx"
+vt_prev_path <- "outputs/Professional Voluntary Turnover Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
 
 # read in current and previous year
 ifr_current <- read_excel_allsheets(filename = ifr_current_path)
-ifr_prev <- read_excel_allsheets(filename = ifr_prev)
+ifr_prev <- read_excel_allsheets(filename = ifr_prev_path)
+
+vt_current <- read_excel_allsheets(filename = vt_current_path)
+vt_prev <- read_excel_allsheets(filename = vt_prev_path)
 
 # column order used by finance
 # use for previous year
@@ -63,6 +69,39 @@ seg <- seg_prev |>
     bind_rows(seg_goal) |> 
     bind_rows(seg_current)
 
+
+```
+
+```{r}
+tmp <- function(previous_output = ifr_prev, current_output = ifr_current, attribute = 'Segment', metric = "IFR") {
+    prev <- previous_output[[attribute]] |> 
+        mutate(data_source = "PY Actual") |> 
+        select(-`Roles Filled Internally`, -`Total Filled Roles`) |> 
+        pivot_wider(names_from = month, values_from = `Internal Fill Rate`) |> 
+        select(where(is.character), "ytd", all_of(column_order))
+
+    # get goals
+    goal <- previous_output[[attribute]] |> 
+        select(-`Roles Filled Internally`, -`Total Filled Roles`, -`Internal Fill Rate`) |> 
+        mutate(data_source = "Goal") |> 
+        mutate(Goal = 0.50) |> 
+        pivot_wider(names_from = month, values_from = Goal) |> 
+        select(where(is.character), "ytd", all_of(column_order))
+
+    # get current data
+    current <- current_output[[attribute]]  |>
+        mutate(data_source = "CY Actual") |> 
+        select(-`Roles Filled Internally`, -`Total Filled Roles`) |> 
+        pivot_wider(names_from = month, values_from = `Internal Fill Rate`) |> 
+        select(where(is.character), "ytd", all_of(column_order_dynamic))
+
+    # combine all together
+    combined <- prev |> 
+        bind_rows(goal) |> 
+        bind_rows(current)
+
+    return(combined)
+}
 
 ```
 
