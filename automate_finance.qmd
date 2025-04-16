@@ -23,7 +23,9 @@ ifr_prev <- read_excel_allsheets(filename = ifr_prev_path)
 
 vt_current <- read_excel_allsheets(filename = vt_current_path)
 vt_prev <- read_excel_allsheets(filename = vt_prev_path)
+```
 
+```{r}
 # column order used by finance
 # use for previous year
 column_order <- c("Jan", "Feb", "Mar", "Q1", "Apr", "May", "Jun", "Q2", "Jul", "Aug", "Sep", "Q3", "Oct", "Nov", "Dec", "Q4") 
@@ -37,43 +39,10 @@ current_month_index <- which(column_order == current_month) - 1
 # filter column order to only include current months
 # use for current year
 column_order_dynamic <- column_order[1:current_month_index]
-
-# get previous
-seg_prev <- ifr_prev$Segment |> 
-    # # temp filter
-    # filter(segment_function == "Corporate") |> 
-    mutate(data_source = "PY Actual") |> 
-    select(-`Roles Filled Internally`, -`Total Filled Roles`) |> 
-    pivot_wider(names_from = month, values_from = `Internal Fill Rate`) |> 
-    select(where(is.character), "ytd", all_of(column_order))
-
-# get goals
-seg_goal <- ifr_prev$Segment |> 
-    select(-`Roles Filled Internally`, -`Total Filled Roles`, -`Internal Fill Rate`) |> 
-    mutate(data_source = "Goal") |> 
-    mutate(Goal = 0.50) |> 
-    pivot_wider(names_from = month, values_from = Goal) |> 
-    select(where(is.character), "ytd", all_of(column_order))
-
-# get current data
-seg_current <- ifr_current$Segment |>
-    # # temp filter
-    # filter(segment_function == "Corporate") |>
-    mutate(data_source = "CY Actual") |> 
-    select(-`Roles Filled Internally`, -`Total Filled Roles`) |> 
-    pivot_wider(names_from = month, values_from = `Internal Fill Rate`) |> 
-    select(where(is.character), "ytd", all_of(column_order_dynamic))
-
-# combine all together
-seg <- seg_prev |> 
-    bind_rows(seg_goal) |> 
-    bind_rows(seg_current)
-
-
 ```
 
 ```{r}
-tmp <- function(previous_output = ifr_prev, current_output = ifr_current, attribute = 'Segment', metric = "IFR") {
+internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_current, attribute = 'Segment', metric = "IFR") {
     prev <- previous_output[[attribute]] |> 
         mutate(data_source = "PY Actual") |> 
         select(-`Roles Filled Internally`, -`Total Filled Roles`) |> 
@@ -82,7 +51,7 @@ tmp <- function(previous_output = ifr_prev, current_output = ifr_current, attrib
 
     # get goals
     goal <- previous_output[[attribute]] |> 
-        select(-`Roles Filled Internally`, -`Total Filled Roles`, -`Internal Fill Rate`) |> 
+        select(c(1:3)) |> 
         mutate(data_source = "Goal") |> 
         mutate(Goal = 0.50) |> 
         pivot_wider(names_from = month, values_from = Goal) |> 
@@ -103,6 +72,10 @@ tmp <- function(previous_output = ifr_prev, current_output = ifr_current, attrib
     return(combined)
 }
 
+```
+
+```{r}
+tmp <- internal_fill_bur(attribute = "Segment by Division")
 ```
 
 ```{r}
