@@ -6,6 +6,7 @@ format: html
 
 ```{r}
 library(tidyverse)
+library(openxlsx)
 
 # read in helper functions
 source("helper_functions.R")
@@ -51,7 +52,7 @@ internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_c
 
     # get goals
     goal <- previous_output[[attribute]] |> 
-        select(c(1:3)) |> 
+        select(where(is.character)) |> 
         mutate(data_source = "Goal") |> 
         mutate(Goal = 0.50) |> 
         pivot_wider(names_from = month, values_from = Goal) |> 
@@ -68,7 +69,10 @@ internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_c
     # combine all together
     combined <- prev |> 
         bind_rows(goal) |> 
-        bind_rows(current)
+        bind_rows(current) |> 
+        mutate(segment_function = case_when(segment_function == "Corporate" ~ "Corporate",
+                                            TRUE ~ str_extract(segment_function, pattern = "\\(([^)]+)\\)"))) |> 
+        mutate(segment_function = str_remove_all(segment_function, "[()]"))
 
     return(combined)
 }
@@ -76,66 +80,82 @@ internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_c
 ```
 
 ```{r}
-calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
+bur_segment <- internal_fill_bur(attribute = "Segment")
 
-  # calculate internal fill by month
-  df_month <- df |> 
-    mutate(month = as.Date(floor_date(time_in_job_profile_start_date, "month"))) |> 
-    group_by(across(all_of(grouping_var)), month, internal_external) |> 
-    summarize(count = n_distinct(employee_id, effective_date), .groups = "drop_last") |> 
-    ungroup() |> 
-    complete(nesting(!!!syms(grouping_var)), month, 
-            internal_external = c("Internal", "External"), 
-             fill = list(count = 0)) |>  
-    mutate(total = sum(count),
-           fill_rate = round(count / total, 4)) |> 
-    ungroup() |> 
-    filter(internal_external == "Internal") |> 
-    arrange(month) |> 
-    select(-internal_external) |> 
-    mutate(month = month(month, label = TRUE))
+bur_division <- internal_fill_bur(attribute = "Segment by Division")
+
+bur_plant <- internal_fill_bur(attribute = "Division by Location")
+```
+
+```{r}
+# split by segment
+bur_segment_split <- split(bur_segment, bur_segment$segment_function)
+
+bur_division_split <- split(bur_division, bur_division$segment_function)
+
+bur_plant_split <- split(bur_plant, bur_plant$segment_function)
+```
+
+```{r}
+# combine segment and division splits
+bur_combined_segments <- lapply(names(bur_division_split), function(segment_function) {
+    combined_df <- bind_rows(bur_division_split[[segment_function]], 
+                                bur_segment_split[[segment_function]])
+    return(combined_df)
+})
+
+names(bur_combined_segments) <- names(bur_division_split)
+```
+
+```{r}
+# create excel files
+
+lapply(names(bur_combined_segments), function(segment_function) {
+    wb <- createWorkbook()
+
+    combined_df <- bur_combined_segments[[segment_function]]
+
+    unique_divisions <- unique(combined_df$division_function)
+
+    lapply(unique_divisions, function(division_function) {
+
+        # truncate names to less than 31 characters
+        short_division_name <- case_when(nchar(division_function) > 30 ~ substr(division_function, 1, 30),
+                                        is.na(division_function) ~ segment_function,
+                                        TRUE ~ division_function)
+
+        addWorksheet(wb, short_division_name)
+
+        division_data <- combined_df |> 
+            filter(division_function == !!division_function)
+            writeData(wb, short_division_name, division_data)
+    })
+
+    saveWorkbook(wb, paste0("tmp_",segment_function,".xlsx"), overwrite = TRUE)
+})
+
+
+# wb <- createWorkbook()
+
+# for (sheet_name in names(monthly_results_named)) {
+#   addWorksheet(wb, sheet_name)
+#   writeDataTable(wb, sheet = sheet_name, x = monthly_results_named[[sheet_name]], tableStyle = "TableStyleMedium2")
   
-  return(df_month)
-}
+#   # Get the column index for "Internal Fill Rate"
+#   internal_fill_rate_col <- which(names(monthly_results_named[[sheet_name]]) == "Internal Fill Rate")
+  
+#   # Apply percentage format to the "Internal Fill Rate" column
+#   if (length(internal_fill_rate_col) > 0) {
+#     addStyle(wb, sheet = sheet_name, 
+#              style = createStyle(numFmt = "0%"), 
+#              cols = internal_fill_rate_col, 
+#              rows = 2:(nrow(monthly_results_named[[sheet_name]]) + 1), 
+#              gridExpand = TRUE)
+#   }
+# }
 
-```
+# saveWorkbook(wb, output_name, overwrite = TRUE)
 
-```{r}
-grouping_vars <- list(NULL, 
-                      "segment_function", 
-                      c("segment_function", "division_function"), 
-                      c("segment_function", "division_function", "business_unit_sub_function"),
-                      c("segment_function", "division_function", "location"),
-                      c("segment_function", "career_level_bucket"),
-                      "career_level_bucket")
-
-
-tmp <- full_df |> 
-    mutate(month = as.Date(floor_date(time_in_job_profile_start_date, "month"))) |> 
-    group_by(division_function, month, internal_external) |>  
-    summarize(count = n_distinct(employee_id, effective_date), .groups = "drop_last") |> 
-    ungroup() |> 
-    complete(division_function, month, 
-            internal_external = c("Internal", "External"), 
-             fill = list(count = 0))
-```
-
-```{r}
-monthly_results <- map(grouping_vars, ~calculate_internal_fill_monthly(full_df, .x))
-```
-
-```{r}
-tmp_check <- monthly_results[[3]] |> 
-    group_by(division_function) |> 
-    summarize(n = n())
-
-tmp |> 
-    group_by(division_function) |> 
-    summarize(n = n())
-```
-
-```{r}
-tmp <- internal_fill_bur(attribute = "Segment by Division")
 ```
 
 ```{r}
