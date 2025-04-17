@@ -161,9 +161,11 @@ calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
     mutate(month = as.Date(floor_date(time_in_job_profile_start_date, "month"))) |> 
     group_by(across(all_of(grouping_var)), month, internal_external) |> 
     summarize(count = n_distinct(employee_id, effective_date), .groups = "drop_last") |> 
-    group_by(across(all_of(grouping_var)), month) |> 
-    complete(internal_external = c("Internal", "External"), 
-             fill = list(count = 0)) |>  
+    ungroup() |> 
+    complete(nesting(!!!syms(grouping_var)), month, 
+              internal_external = c("Internal", "External"), 
+                fill = list(count = 0)) |>  
+    group_by(across(all_of(grouping_var)), month) |>  
     mutate(total = sum(count),
            fill_rate = round(count / total, 4)) |> 
     ungroup() |> 
