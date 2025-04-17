@@ -55,6 +55,7 @@ internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_c
         mutate(data_source = "Goal") |> 
         mutate(Goal = 0.50) |> 
         pivot_wider(names_from = month, values_from = Goal) |> 
+        replace_na(list(Goal = 0.50)) |> 
         select(where(is.character), "ytd", all_of(column_order))
 
     # get current data
@@ -72,6 +73,65 @@ internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_c
     return(combined)
 }
 
+```
+
+```{r}
+calculate_internal_fill_monthly <- function(df = full_df, grouping_var) {
+
+  # calculate internal fill by month
+  df_month <- df |> 
+    mutate(month = as.Date(floor_date(time_in_job_profile_start_date, "month"))) |> 
+    group_by(across(all_of(grouping_var)), month, internal_external) |> 
+    summarize(count = n_distinct(employee_id, effective_date), .groups = "drop_last") |> 
+    ungroup() |> 
+    complete(nesting(!!!syms(grouping_var)), month, 
+            internal_external = c("Internal", "External"), 
+             fill = list(count = 0)) |>  
+    mutate(total = sum(count),
+           fill_rate = round(count / total, 4)) |> 
+    ungroup() |> 
+    filter(internal_external == "Internal") |> 
+    arrange(month) |> 
+    select(-internal_external) |> 
+    mutate(month = month(month, label = TRUE))
+  
+  return(df_month)
+}
+
+```
+
+```{r}
+grouping_vars <- list(NULL, 
+                      "segment_function", 
+                      c("segment_function", "division_function"), 
+                      c("segment_function", "division_function", "business_unit_sub_function"),
+                      c("segment_function", "division_function", "location"),
+                      c("segment_function", "career_level_bucket"),
+                      "career_level_bucket")
+
+
+tmp <- full_df |> 
+    mutate(month = as.Date(floor_date(time_in_job_profile_start_date, "month"))) |> 
+    group_by(division_function, month, internal_external) |>  
+    summarize(count = n_distinct(employee_id, effective_date), .groups = "drop_last") |> 
+    ungroup() |> 
+    complete(division_function, month, 
+            internal_external = c("Internal", "External"), 
+             fill = list(count = 0))
+```
+
+```{r}
+monthly_results <- map(grouping_vars, ~calculate_internal_fill_monthly(full_df, .x))
+```
+
+```{r}
+tmp_check <- monthly_results[[3]] |> 
+    group_by(division_function) |> 
+    summarize(n = n())
+
+tmp |> 
+    group_by(division_function) |> 
+    summarize(n = n())
 ```
 
 ```{r}
