@@ -115,7 +115,8 @@ lapply(names(bur_combined_segments), function(segment_function) {
 
     # get the combined file for each segment, if division is blank replace with segment
     combined_df <- bur_combined_segments[[segment_function]] |> 
-        mutate(division_function = coalesce(division_function, segment_function))
+
+        mutate(division_function = coalesce(division_function, paste0("L1_", segment_function)))
     
     # get each unique division for sheet creation
     unique_divisions <- unique(combined_df$division_function)
