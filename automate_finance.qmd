@@ -113,19 +113,24 @@ names(bur_combined_segments) <- names(bur_division_split)
 lapply(names(bur_combined_segments), function(segment_function) {
     wb <- createWorkbook()
 
-    combined_df <- bur_combined_segments[[segment_function]]
-
+    # get the combined file for each segment, if division is blank replace with segment
+    combined_df <- bur_combined_segments[[segment_function]] |> 
+        mutate(division_function = coalesce(division_function, segment_function))
+    
+    # get each unique division for sheet creation
     unique_divisions <- unique(combined_df$division_function)
 
     lapply(unique_divisions, function(division_function) {
 
-        # truncate names to less than 31 characters
-        short_division_name <- case_when(nchar(division_function) > 30 ~ substr(division_function, 1, 30),
-                                        is.na(division_function) ~ segment_function,
-                                        TRUE ~ division_function)
-
+        # truncate names to less than 31 characters and remove special characters
+        short_division_name <- case_when(nchar(division_function) > 30 ~ substr(division_function, 1, 30), 
+                                        TRUE ~ division_function) |>
+                                str_remove("[/]")
+        
+        # create each sheet
         addWorksheet(wb, short_division_name)
 
+        # add filtered data for each division to each sheet
         division_data <- combined_df |> 
             filter(division_function == !!division_function)
             writeData(wb, short_division_name, division_data)
@@ -133,29 +138,6 @@ lapply(names(bur_combined_segments), function(segment_function) {
 
     saveWorkbook(wb, paste0("tmp_",segment_function,".xlsx"), overwrite = TRUE)
 })
-
-
-# wb <- createWorkbook()
-
-# for (sheet_name in names(monthly_results_named)) {
-#   addWorksheet(wb, sheet_name)
-#   writeDataTable(wb, sheet = sheet_name, x = monthly_results_named[[sheet_name]], tableStyle = "TableStyleMedium2")
-  
-#   # Get the column index for "Internal Fill Rate"
-#   internal_fill_rate_col <- which(names(monthly_results_named[[sheet_name]]) == "Internal Fill Rate")
-  
-#   # Apply percentage format to the "Internal Fill Rate" column
-#   if (length(internal_fill_rate_col) > 0) {
-#     addStyle(wb, sheet = sheet_name, 
-#              style = createStyle(numFmt = "0%"), 
-#              cols = internal_fill_rate_col, 
-#              rows = 2:(nrow(monthly_results_named[[sheet_name]]) + 1), 
-#              gridExpand = TRUE)
-#   }
-# }
-
-# saveWorkbook(wb, output_name, overwrite = TRUE)
-
 ```
 
 ```{r}
