@@ -42,6 +42,8 @@ current_month_index <- which(column_order == current_month) - 1
 column_order_dynamic <- column_order[1:current_month_index]
 ```
 
+# IFR and VT Functions
+
 ```{r}
 internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_current, attribute = 'Segment') {
 
@@ -81,24 +83,6 @@ internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_c
 ```
 
 ```{r}
-# create the full files by each attribute
-ifr_segment <- internal_fill_bur(attribute = "Segment")
-
-ifr_division <- internal_fill_bur(attribute = "Segment by Division")
-
-ifr_plant <- internal_fill_bur(attribute = "Division by Location")
-```
-
-```{r}
-# split by segment
-ifr_segment_split <- split(ifr_segment, ifr_segment$segment_function)
-
-ifr_division_split <- split(ifr_division, ifr_division$segment_function)
-
-ifr_plant_split <- split(ifr_plant, ifr_plant$segment_function)
-```
-
-```{r}
 voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = vt_current, attribute = 'Segment') {
       
       prev <- previous_output[[attribute]] |> 
@@ -134,6 +118,17 @@ voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = v
 }
 ```
 
+# Create Dataframes
+
+```{r}
+# create the full files by each attribute
+ifr_segment <- internal_fill_bur(attribute = "Segment")
+
+ifr_division <- internal_fill_bur(attribute = "Segment by Division")
+
+ifr_plant <- internal_fill_bur(attribute = "Division by Location")
+```
+
 ```{r}
 # create the full files by each attribute
 vt_segment <- voluntary_turnover_bur(attribute = "Segment")
@@ -143,14 +138,7 @@ vt_division <- voluntary_turnover_bur(attribute = "Segment by Division")
 vt_plant <- voluntary_turnover_bur(attribute = "Division by Location")
 ```
 
-```{r}
-# split by segment
-vt_segment_split <- split(vt_segment, vt_segment$segment_function)
-
-vt_division_split <- split(vt_division, vt_division$segment_function)
-
-vt_plant_split <- split(vt_plant, vt_plant$segment_function)
-```
+# Combine VT and IFR
 
 ```{r}
 # combine ifr and vt together
@@ -182,6 +170,8 @@ bur_combined_segments <- lapply(names(division_split), function(segment_function
 
 names(bur_combined_segments) <- names(division_split)
 ```
+
+# Create Output
 
 ```{r}
 # create excel files
