@@ -43,7 +43,8 @@ column_order_dynamic <- column_order[1:current_month_index]
 ```
 
 ```{r}
-internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_current, attribute = 'Segment', metric = "IFR") {
+internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_current, attribute = 'Segment') {
+
     prev <- previous_output[[attribute]] |> 
         mutate(data_source = "PY Actual") |> 
         select(-`Roles Filled Internally`, -`Total Filled Roles`) |> 
@@ -80,31 +81,106 @@ internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_c
 ```
 
 ```{r}
-bur_segment <- internal_fill_bur(attribute = "Segment")
+# create the full files by each attribute
+ifr_segment <- internal_fill_bur(attribute = "Segment")
 
-bur_division <- internal_fill_bur(attribute = "Segment by Division")
+ifr_division <- internal_fill_bur(attribute = "Segment by Division")
 
-bur_plant <- internal_fill_bur(attribute = "Division by Location")
+ifr_plant <- internal_fill_bur(attribute = "Division by Location")
 ```
 
 ```{r}
 # split by segment
-bur_segment_split <- split(bur_segment, bur_segment$segment_function)
+ifr_segment_split <- split(ifr_segment, ifr_segment$segment_function)
 
-bur_division_split <- split(bur_division, bur_division$segment_function)
+ifr_division_split <- split(ifr_division, ifr_division$segment_function)
 
-bur_plant_split <- split(bur_plant, bur_plant$segment_function)
+ifr_plant_split <- split(ifr_plant, ifr_plant$segment_function)
+```
+
+```{r}
+voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = vt_current, attribute = 'Segment') {
+      
+      prev <- previous_output[[attribute]] |> 
+        mutate(data_source = "PY Actual") |> 
+        select(-headcount, -voluntary_terminations, -ytd_annualized) |> 
+        pivot_wider(names_from = month, values_from = voluntary_turnover) |> 
+        select(where(is.character), "ytd", all_of(column_order))
+
+      goal <- previous_output[[attribute]] |> 
+        select(where(is.character), voluntary_turnover) |> 
+        filter(month != "ytd") |> 
+        mutate(data_source = "Goal") |> 
+        mutate(Goal = voluntary_turnover*0.90) |> 
+        select(-voluntary_turnover) |> 
+        pivot_wider(names_from = month, values_from = Goal) |> 
+        select(where(is.character), all_of(column_order))
+
+      current <- previous_output[[attribute]]  |>
+        mutate(data_source = "CY Actual") |> 
+        select(-headcount, -voluntary_terminations, -ytd_annualized) |> 
+        pivot_wider(names_from = month, values_from = voluntary_turnover) |> 
+        select(where(is.character), "ytd", all_of(column_order_dynamic))
+
+      combined <- prev |> 
+        bind_rows(goal) |> 
+        bind_rows(current) |> 
+        mutate(segment_function = case_when(
+              segment_function == "Corporate" ~ "Corporate",
+              TRUE ~ str_extract(segment_function, pattern = "\\(([^)]+)\\)"))) |> 
+        mutate(segment_function = str_remove_all(segment_function, "[()]"))
+  
+  return(combined)
+}
+```
+
+```{r}
+# create the full files by each attribute
+vt_segment <- voluntary_turnover_bur(attribute = "Segment")
+
+vt_division <- voluntary_turnover_bur(attribute = "Segment by Division")
+
+vt_plant <- voluntary_turnover_bur(attribute = "Division by Location")
+```
+
+```{r}
+# split by segment
+vt_segment_split <- split(vt_segment, vt_segment$segment_function)
+
+vt_division_split <- split(vt_division, vt_division$segment_function)
+
+vt_plant_split <- split(vt_plant, vt_plant$segment_function)
+```
+
+```{r}
+# combine ifr and vt together
+segment <- vt_segment |> 
+    bind_rows(ifr_segment)
+
+division <- vt_division |> 
+    bind_rows(ifr_division)
+
+plant <- vt_plant |> 
+    bind_rows(ifr_plant)
+```
+
+```{r}
+segment_split <- split(segment, segment$segment_function)
+
+division_split <- split(division, division$segment_function)
+
+plant_split <- split(plant, plant$segment_function)
 ```
 
 ```{r}
 # combine segment and division splits
-bur_combined_segments <- lapply(names(bur_division_split), function(segment_function) {
-    combined_df <- bind_rows(bur_division_split[[segment_function]], 
-                                bur_segment_split[[segment_function]])
+bur_combined_segments <- lapply(names(division_split), function(segment_function) {
+    combined_df <- bind_rows(division_split[[segment_function]], 
+                            segment_split[[segment_function]])
     return(combined_df)
 })
 
-names(bur_combined_segments) <- names(bur_division_split)
+names(bur_combined_segments) <- names(division_split)
 ```
 
 ```{r}
@@ -137,20 +213,23 @@ lapply(names(bur_combined_segments), function(segment_function) {
             writeData(wb, short_division_name, division_data)
     })
 
-    saveWorkbook(wb, paste0("tmp_",segment_function,".xlsx"), overwrite = TRUE)
+    saveWorkbook(wb, paste0("outputs/BURs/tmp_",segment_function,".xlsx"), overwrite = TRUE)
 })
 ```
 
 ```{r}
 # get goal that is 10% improvement from previous year
 ############ WILL ONLY NEED FOR VT, NOT IFR ##########################
-seg_goal <- seg_prev |> 
-    select(where(is.character), ytd) |> 
-    mutate(goal = ytd * 0.90)
+# seg_goal <- seg_prev |> 
+#     select(where(is.character), ytd) |> 
+#     mutate(goal = ytd * 0.90)
 
-# get goal for each month and quarter
-goal_values <- c(rep(seg_goal / 12, 3), seg_goal / 4, 
-                rep(seg_goal / 12, 3), seg_goal / 4,
-                rep(seg_goal / 12, 3), seg_goal / 4,
-                rep(seg_goal / 12, 3), seg_goal / 4)
+# # get goal for each month and quarter
+# goal_values <- c(rep(seg_goal / 12, 3), seg_goal / 4, 
+#                 rep(seg_goal / 12, 3), seg_goal / 4,
+#                 rep(seg_goal / 12, 3), seg_goal / 4,
+#                 rep(seg_goal / 12, 3), seg_goal / 4)
 ```
+
+# Voluntary Turnover
+
