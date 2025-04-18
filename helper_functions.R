@@ -111,7 +111,7 @@ calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grou
       .groups = 'drop'
     ) |> 
     mutate(
-      month = "YTD",
+      month = "ytd",
       ytd_annualized = round(voluntary_turnover * (12 / length(last_day_of_month)), 4)
     )
   
