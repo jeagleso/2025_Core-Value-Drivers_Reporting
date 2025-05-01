@@ -40,6 +40,13 @@ current_month_index <- which(column_order == current_month) - 1
 # filter column order to only include current months
 # use for current year
 column_order_dynamic <- column_order[1:current_month_index]
+
+# get the remaining months for forecasting
+remaining_months <- setdiff(column_order, column_order_dynamic)
+
+remaining_months_tibble <- tibble(remaining_months,
+                                  value = NA) |> 
+  pivot_wider(names_from = remaining_months, values_from = value)
 ```
 
 # IFR and VT Functions
