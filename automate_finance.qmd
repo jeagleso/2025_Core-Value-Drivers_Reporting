@@ -83,7 +83,7 @@ internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_c
         mutate(segment_function = case_when(segment_function == "Corporate" ~ "Corporate",
                                             TRUE ~ str_extract(segment_function, pattern = "\\(([^)]+)\\)"))) |> 
         mutate(segment_function = str_remove_all(segment_function, "[()]")) |> 
-        mutate(cvd = "Voluntary Turnover Professional") |> 
+        mutate(cvd = "Internal Fill Rate") |> 
         relocate(cvd, .before = data_source)
 
     return(combined)
@@ -119,15 +119,25 @@ voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = v
         select(-headcount, -voluntary_terminations, -month, -voluntary_turnover) |> 
         filter(!is.na(ytd_annualized))
 
+    forecast <- ytd_annualized |> 
+        mutate(forecast = ytd_annualized / 12) |> 
+        bind_cols(remaining_months_tibble) |> 
+        mutate(across(everything(), ~ ifelse(is.na(.), case_when(str_detect(cur_column(), "Q") ~ forecast * 3, TRUE ~ forecast), .))) |> 
+        select(-ytd_annualized, -forecast)
+
+    commit_forecast <- current |> 
+        left_join(forecast) |> 
+        mutate(data_source = "Commit/Forecast")
+
       combined <- prev |> 
         bind_rows(goal) |> 
-        bind_rows(current) |> 
+        bind_rows(commit_forecast) |> 
         left_join(ytd_annualized) |> 
         mutate(segment_function = case_when(
               segment_function == "Corporate" ~ "Corporate",
               TRUE ~ str_extract(segment_function, pattern = "\\(([^)]+)\\)"))) |> 
         mutate(segment_function = str_remove_all(segment_function, "[()]")) |> 
-        mutate(cvd = "Internal Fill Rate") |> 
+        mutate(cvd = "Voluntary Turnover Professional") |> 
         relocate(cvd, .before = data_source)
   
   return(combined)
