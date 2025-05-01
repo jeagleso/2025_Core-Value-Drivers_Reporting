@@ -87,17 +87,29 @@ internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_c
         left_join(forecast) |> 
         mutate(data_source = "Commit/Forecast")
 
+    # get just ytd performance for the YTD metric first on the finance template
+    ytd_perf <- current |> 
+        select(1:ytd) |> 
+        rename(ytd_value = ytd) |> 
+        select(-data_source)
+
     # combine all together
     combined <- prev |> 
         bind_rows(goal) |> 
         bind_rows(commit_forecast) |> 
+        left_join(ytd_perf) |> 
         mutate(segment_function = case_when(segment_function == "Corporate" ~ "Corporate",
                                             TRUE ~ str_extract(segment_function, pattern = "\\(([^)]+)\\)"))) |> 
         mutate(segment_function = str_remove_all(segment_function, "[()]")) |> 
         mutate(cvd = "Internal Fill Rate") |> 
         relocate(cvd, .before = data_source)
 
-    return(combined)
+    reformat <- combined |> 
+        rename(FY = ytd) |>  
+        relocate(FY, .after = last_col()) |> 
+        relocate(ytd_value, .before = data_source)
+
+    return(reformat)
 }
 
 ```
@@ -249,6 +261,12 @@ lapply(names(bur_combined_segments), function(segment_function) {
         division_data <- combined_df |> 
             filter(division_function == !!division_function)
             writeData(wb, short_division_name, division_data)
+
+        
+        # Apply percentage formatting to all numeric columns
+        numeric_cols <- which(sapply(division_data, is.numeric))
+        addStyle(wb, short_division_name, cols = numeric_cols, rows = 2:(nrow(division_data) + 1), style = createStyle(numFmt = "0.0%"), gridExpand = TRUE)
+
     })
 
     saveWorkbook(wb, paste0("outputs/BURs/tmp_",segment_function,".xlsx"), overwrite = TRUE)
