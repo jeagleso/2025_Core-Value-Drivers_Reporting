@@ -76,12 +76,13 @@ internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_c
         pivot_wider(names_from = month, values_from = `Internal Fill Rate`) |> 
         select(where(is.character), "ytd", all_of(column_order_dynamic))
 
-    # get forecast based on current data
+    # get forecast based on current data for remaining months
     forecast <- current |> 
         select(1:ytd) |> 
         bind_cols(remaining_months_tibble) |> 
         mutate(across(everything(), ~ ifelse(is.na(.), ytd, .)))
 
+    # combining current year and forecast for remaining months
     commit_forecast <- current |> 
         left_join(forecast) |> 
         mutate(data_source = "Commit/Forecast")
@@ -112,12 +113,12 @@ voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = v
 
       goal <- previous_output[[attribute]] |> 
         select(where(is.character), voluntary_turnover) |> 
-        filter(month != "ytd") |> 
+        # filter(month != "ytd") |> 
         mutate(data_source = "AOP") |> 
         mutate(Goal = voluntary_turnover*0.90) |> 
         select(-voluntary_turnover) |> 
         pivot_wider(names_from = month, values_from = Goal) |> 
-        select(where(is.character), all_of(column_order))
+        select(where(is.character), "ytd", all_of(column_order))
 
       current <- current_output[[attribute]]  |>
         mutate(data_source = "CY Actual") |> 
@@ -152,8 +153,16 @@ voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = v
         mutate(segment_function = str_remove_all(segment_function, "[()]")) |> 
         mutate(cvd = "Voluntary Turnover Professional") |> 
         relocate(cvd, .before = data_source)
+
+    reformat <- combined |> 
+        rename(FY = ytd,
+                ytd_value = ytd_annualized) |> 
+        relocate(ytd_value, .before = data_source) |> 
+        relocate(FY, .after = last_col()) |> 
+        mutate(FY = case_when(data_source == "Commit/Forecast" ~ ytd_value,
+                                TRUE ~ FY))
   
-  return(combined)
+  return(reformat)
 }
 ```
 
