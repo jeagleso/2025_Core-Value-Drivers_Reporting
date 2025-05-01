@@ -12,10 +12,10 @@ library(openxlsx)
 source("helper_functions.R")
 
 # filepaths
-ifr_current_path <- "outputs/Internal Fill Rate Monthly 2025-01-01 to 2025-03-31.xlsx"
+ifr_current_path <- "outputs/Internal Fill Rate Monthly 2025-01-01 to 2025-04-30.xlsx"
 ifr_prev_path <- "outputs/Internal Fill Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
 
-vt_current_path <- "outputs/Professional Voluntary Turnover Rate Monthly 2025-01-01 to 2025-03-31.xlsx"
+vt_current_path <- "outputs/Professional Voluntary Turnover Rate Monthly 2025-01-01 to 2025-04-30.xlsx"
 vt_prev_path <- "outputs/Professional Voluntary Turnover Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
 
 # read in current and previous year
@@ -75,7 +75,9 @@ internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_c
         bind_rows(current) |> 
         mutate(segment_function = case_when(segment_function == "Corporate" ~ "Corporate",
                                             TRUE ~ str_extract(segment_function, pattern = "\\(([^)]+)\\)"))) |> 
-        mutate(segment_function = str_remove_all(segment_function, "[()]"))
+        mutate(segment_function = str_remove_all(segment_function, "[()]")) |> 
+        mutate(cvd = "Voluntary Turnover Professional") |> 
+        relocate(cvd, .before = data_source)
 
     return(combined)
 }
@@ -117,7 +119,9 @@ voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = v
         mutate(segment_function = case_when(
               segment_function == "Corporate" ~ "Corporate",
               TRUE ~ str_extract(segment_function, pattern = "\\(([^)]+)\\)"))) |> 
-        mutate(segment_function = str_remove_all(segment_function, "[()]"))
+        mutate(segment_function = str_remove_all(segment_function, "[()]")) |> 
+        mutate(cvd = "Internal Fill Rate") |> 
+        relocate(cvd, .before = data_source)
   
   return(combined)
 }
