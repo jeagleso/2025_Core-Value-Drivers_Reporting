@@ -29,20 +29,20 @@ library(tidyverse)
 source("helper_functions.R")
 
 # specify period: first date of current year and last day of previous month
-# start_date <- as.Date(floor_date(Sys.Date(), "year"))
-# end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
+start_date <- as.Date(floor_date(Sys.Date(), "year"))
+end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
 
-# get active and terminated, add career_level bucket
-# active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 4) |> 
-#   janitor::clean_names() |> 
-#   add_buckets()
-
-# use for 2024 file
-start_date <- as.Date("2024-01-01")
-end_date <- as.Date("2024-12-31")
-active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT 2024.xlsx", skip = 4) |> 
+# # get active and terminated, add career_level bucket
+active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 4) |> 
   janitor::clean_names() |> 
   add_buckets()
+
+# use for 2024 file
+# start_date <- as.Date("2024-01-01")
+# end_date <- as.Date("2024-12-31")
+# active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT 2024.xlsx", skip = 4) |> 
+#   janitor::clean_names() |> 
+#   add_buckets()
 
 # get all months included in period
 months_included <- seq(start_date, end_date, by = "month")
@@ -58,25 +58,48 @@ monthly_data <- tibble(last_day_of_month = as.Date(last_day_of_month))
 #| label: manu_vs_prof
 
 # running professional+
-# output_name <- paste0("outputs/Professional Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
+output_name <- paste0("outputs/Professional Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
 
-# pa_at <- active_and_terminated |> 
-#   apply_general_filters() |> 
-#   filter(career_level_bucket != "DL_IDL")
+pa_at <- active_and_terminated |> 
+  apply_general_filters() |> 
+  filter(career_level_bucket != "DL_IDL")
 
 # running manufacturing 
 # name the output excel file for manufacturing
-output_name <- paste0("outputs/Manufacturing Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
+# output_name <- paste0("outputs/Manufacturing Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
 
-pa_at <- active_and_terminated |> 
-  apply_general_filters() |>
-  filter(career_level_bucket == "DL_IDL")
+# pa_at <- active_and_terminated |>
+#   apply_general_filters() |>
+#   filter(career_level_bucket == "DL_IDL")
 ```
 
 ```{r}
 # get results for all grouping variable combinations
 monthly_turnover_data <- map(grouping_vars, ~ calculate_voluntary_turnover_monthly(pa_at, .x)) |> 
   set_names(output_sheet_names)
+```
+
+
+```{r}
+# tbls_to_include <- c("Enterprise", "Segment", "Segment by Division", "Division by Location")
+
+# # if current year, add goal from prev year
+# prev_year_vt <- read_excel_allsheets(filename = "outputs/Professional Voluntary Turnover Rate Monthly 2024-01-01 to 2024-12-31.xlsx")
+
+# prev_year_vt <- prev_year_vt[names(prev_year_vt) %in% tbls_to_include]
+
+# current_vt <- monthly_turnover_data[names(monthly_turnover_data) %in% tbls_to_include]
+
+# left_join_lists <- function(prev_list, current_list) {
+#   map2(prev_list, current_list, ~ {
+#     join_col <- names(.x)[which(names(.x) == "headcount") - 1]
+#     left_join(.x, .y, by = join_col)
+#   })
+# }
+
+
+
+# combined <- left_join_lists(prev_list = prev_year_vt, current_list = current_vt)
 ```
 
 ```{r}
@@ -89,7 +112,7 @@ monthly_headcount <- map_df(last_day_of_month, function(date) {
     select(employee_id, worker, hire_date, employee_type,
     termination_date, termination_category, termination_reason, 
     segment_function, division_function, business_unit_sub_function,
-    location, career_level, date, 
+    location, location_address_country, career_level, date, job_family, job_family_group, 
     management_chain_level_2, management_chain_level_3, management_chain_level_4, management_chain_level_5)
 
   return(headcount)
@@ -114,7 +137,8 @@ monthly_turnover_data[["Voluntary Terms"]] <- pa_at |>
   select(employee_id, worker, hire_date, employee_type,
         termination_date, termination_category, termination_reason, regrettable_termination,
         segment_function, division_function, business_unit_sub_function,
-        location, career_level, management_chain_level_2, management_chain_level_3, management_chain_level_4, management_chain_level_5) |> 
+        location, location_address_country, career_level, job_family, job_family_group, 
+        management_chain_level_2, management_chain_level_3, management_chain_level_4, management_chain_level_5) |> 
   mutate_at(vars(contains("date")), as.Date)
 ```
 
