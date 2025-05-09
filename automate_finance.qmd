@@ -303,12 +303,14 @@ lapply(names(plant_split), function(division_function) {
     wb <- createWorkbook()
 
     # get the combined file for each segment, if division is blank replace with segment
-    combined_df <- plant_split[[division_function]] 
+    division_df <- plant_split[[division_function]] |> 
+        filter(division_function == !!division_function)
+
 
         # mutate(division_function = coalesce(division_function, paste0("L1_", segment_function)))
     
     # get each unique division for sheet creation
-    unique_plants <- unique(combined_df$location)
+    unique_plants <- unique(division_df$location)
 
     lapply(unique_plants, function(location) {
 
@@ -321,9 +323,10 @@ lapply(names(plant_split), function(division_function) {
         addWorksheet(wb, short_plant_name)
 
         # add filtered data for each division to each sheet
-        plant_data <- combined_df |> 
+        plant_data <- division_df |> 
             filter(location == !!location)
-            writeData(wb, short_plant_name, plant_data)
+        
+        writeData(wb, short_plant_name, plant_data)
 
         
         # Apply percentage formatting to all numeric columns
