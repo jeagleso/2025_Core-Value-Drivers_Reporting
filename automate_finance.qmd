@@ -145,8 +145,8 @@ voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = v
         select(where(is.character), "ytd", all_of(column_order_dynamic))
 
     ytd_annualized <- current_output[[attribute]] |> 
-        select(-headcount, -voluntary_terminations, -month, -voluntary_turnover) |> 
-        filter(!is.na(ytd_annualized))
+        filter(month == "ytd", !is.na(ytd_annualized)) |> 
+        select(-headcount, -voluntary_terminations, -month, -voluntary_turnover)
     
     # get the remaining months and use forecast for months, forecast * 3 for cols starting with Q
     forecast <- ytd_annualized |> 
@@ -335,7 +335,7 @@ lapply(names(plant_split), function(division_function) {
 
     })
 
-    saveWorkbook(wb, paste0("outputs/SORs/SOR Testing_",division_function, ".xlsx"), 
+    saveWorkbook(wb, paste0("outputs/SORs/SOR Testing_", division_function, ".xlsx"), 
                 overwrite = TRUE)
 })
 ```
