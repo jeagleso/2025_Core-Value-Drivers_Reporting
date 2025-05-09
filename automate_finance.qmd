@@ -18,12 +18,18 @@ ifr_prev_path <- "outputs/Internal Fill Rate Monthly 2024-01-01 to 2024-12-31.xl
 vt_current_path <- "outputs/Professional Voluntary Turnover Rate Monthly 2025-01-01 to 2025-04-30.xlsx"
 vt_prev_path <- "outputs/Professional Voluntary Turnover Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
 
+mf_vt_current_path <- "outputs/Manufacturing Voluntary Turnover Rate Monthly 2025-01-01 to 2025-04-30.xlsx"
+mf_vt_prev_path <- "outputs/Manufacturing Voluntary Turnover Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
+
 # read in current and previous year
 ifr_current <- read_excel_allsheets(filename = ifr_current_path)
 ifr_prev <- read_excel_allsheets(filename = ifr_prev_path)
 
 vt_current <- read_excel_allsheets(filename = vt_current_path)
 vt_prev <- read_excel_allsheets(filename = vt_prev_path)
+
+mf_vt_current <- read_excel_allsheets(filename = mf_vt_current_path)
+mf_vt_prev <- read_excel_allsheets(filename = mf_vt_prev_path)
 ```
 
 ```{r}
@@ -198,6 +204,18 @@ vt_division <- voluntary_turnover_bur(attribute = "Segment by Division")
 vt_plant <- voluntary_turnover_bur(attribute = "Division by Location")
 ```
 
+```{r}
+# create the full files for manufacturing
+mf_vt_segment <- voluntary_turnover_bur(previous_output = mf_vt_prev, current_output = mf_vt_current, 
+                                        attribute = "Segment")
+
+mf_vt_division <- voluntary_turnover_bur(previous_output = mf_vt_prev, current_output = mf_vt_current, 
+                                        attribute = "Segment by Division")
+
+mf_vt_plant <- voluntary_turnover_bur(previous_output = mf_vt_prev, current_output = mf_vt_current, 
+                                        attribute = "Division by Location")
+```
+
 # Combine VT and IFR
 
 ```{r}
@@ -269,23 +287,8 @@ lapply(names(bur_combined_segments), function(segment_function) {
 
     })
 
-    saveWorkbook(wb, paste0("outputs/BURs/tmp_",segment_function,".xlsx"), overwrite = TRUE)
+    saveWorkbook(wb, paste0("outputs/BURs/BUR Testing_",segment_function,".xlsx"), overwrite = TRUE)
 })
 ```
 
-```{r}
-# get goal that is 10% improvement from previous year
-############ WILL ONLY NEED FOR VT, NOT IFR ##########################
-# seg_goal <- seg_prev |> 
-#     select(where(is.character), ytd) |> 
-#     mutate(goal = ytd * 0.90)
-
-# # get goal for each month and quarter
-# goal_values <- c(rep(seg_goal / 12, 3), seg_goal / 4, 
-#                 rep(seg_goal / 12, 3), seg_goal / 4,
-#                 rep(seg_goal / 12, 3), seg_goal / 4,
-#                 rep(seg_goal / 12, 3), seg_goal / 4)
-```
-
-# Voluntary Turnover
 
