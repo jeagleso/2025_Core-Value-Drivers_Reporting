@@ -169,8 +169,12 @@ voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = v
               segment_function == "Corporate" ~ "Corporate",
               TRUE ~ str_extract(segment_function, pattern = "\\(([^)]+)\\)"))) |> 
         mutate(segment_function = str_remove_all(segment_function, "[()]")) |> 
-        mutate(cvd = "Voluntary Turnover Professional") |> 
+        mutate(cvd = case_when(
+                    identical(current_output, vt_current) ~ "Professional Voluntary Turnover",
+                    identical(current_output, mf_vt_current) ~ "Manufacturing Voluntary Turnover",
+                    TRUE ~ "Voluntary Turnover")) |> 
         relocate(cvd, .before = data_source)
+
 
     reformat <- combined |> 
         rename(FY = ytd,
@@ -206,11 +210,11 @@ vt_plant <- voluntary_turnover_bur(attribute = "Division by Location")
 
 ```{r}
 # create the full files for manufacturing
-mf_vt_segment <- voluntary_turnover_bur(previous_output = mf_vt_prev, current_output = mf_vt_current, 
-                                        attribute = "Segment")
+# mf_vt_segment <- voluntary_turnover_bur(previous_output = mf_vt_prev, current_output = mf_vt_current, 
+#                                         attribute = "Segment")
 
-mf_vt_division <- voluntary_turnover_bur(previous_output = mf_vt_prev, current_output = mf_vt_current, 
-                                        attribute = "Segment by Division")
+# mf_vt_division <- voluntary_turnover_bur(previous_output = mf_vt_prev, current_output = mf_vt_current, 
+#                                         attribute = "Segment by Division")
 
 mf_vt_plant <- voluntary_turnover_bur(previous_output = mf_vt_prev, current_output = mf_vt_current, 
                                         attribute = "Division by Location")
@@ -227,7 +231,8 @@ division <- vt_division |>
     bind_rows(ifr_division)
 
 plant <- vt_plant |> 
-    bind_rows(ifr_plant)
+    bind_rows(ifr_plant) |> 
+    bind_rows(mf_vt_plant)
 ```
 
 ```{r}
@@ -235,7 +240,7 @@ segment_split <- split(segment, segment$segment_function)
 
 division_split <- split(division, division$segment_function)
 
-plant_split <- split(plant, plant$segment_function)
+plant_split <- split(plant, plant$division_function)
 ```
 
 ```{r}
@@ -249,10 +254,11 @@ bur_combined_segments <- lapply(names(division_split), function(segment_function
 names(bur_combined_segments) <- names(division_split)
 ```
 
+
 # Create Output
 
 ```{r}
-# create excel files
+# create excel files for POR and BURs
 
 lapply(names(bur_combined_segments), function(segment_function) {
     wb <- createWorkbook()
@@ -291,4 +297,43 @@ lapply(names(bur_combined_segments), function(segment_function) {
 })
 ```
 
+```{r}
+# create files for SORs
+lapply(names(plant_split), function(division_function) {
+    wb <- createWorkbook()
+
+    # get the combined file for each segment, if division is blank replace with segment
+    combined_df <- plant_split[[division_function]] 
+
+        # mutate(division_function = coalesce(division_function, paste0("L1_", segment_function)))
+    
+    # get each unique division for sheet creation
+    unique_plants <- unique(combined_df$location)
+
+    lapply(unique_plants, function(location) {
+
+        # truncate names to less than 31 characters and remove special characters
+        short_plant_name <- case_when(nchar(location) > 30 ~ substr(location, 1, 30), 
+                                        TRUE ~ location) |>
+                                str_remove("[/]")
+        
+        # create each sheet
+        addWorksheet(wb, short_plant_name)
+
+        # add filtered data for each division to each sheet
+        plant_data <- combined_df |> 
+            filter(location == !!location)
+            writeData(wb, short_plant_name, plant_data)
+
+        
+        # Apply percentage formatting to all numeric columns
+        numeric_cols <- which(sapply(plant_data, is.numeric))
+        addStyle(wb, short_plant_name, cols = numeric_cols, rows = 2:(nrow(plant_data) + 1), style = createStyle(numFmt = "0.0%"), gridExpand = TRUE)
+
+    })
+
+    saveWorkbook(wb, paste0("outputs/SORs/SOR Testing_",division_function, ".xlsx"), 
+                overwrite = TRUE)
+})
+```
 
