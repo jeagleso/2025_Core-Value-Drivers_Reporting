@@ -6,7 +6,8 @@ apply_general_filters <- function(df) {
   df |> 
     filter(worker_type == "Employee") |> 
     filter(job_family_group != "Human Resources" | is.na(job_family_group)) |> 
-    filter(segment_function != "Industrial Systems")
+    filter(segment_function != "Industrial Systems") |> 
+    filter(division_function != "Corp Human Resources")
 }
 
 add_buckets <- function(df) {
