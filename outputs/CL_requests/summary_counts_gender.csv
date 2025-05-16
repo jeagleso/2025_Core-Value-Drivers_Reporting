@@ -1,0 +1,16 @@
+career_level_bucket,Female_External,Female_Internal,Total_Female,Male_External,Male_Internal,Total_Male,Total_Internal,Total,Female_Percent_Internal,Female_Percent_Total_New_Roles,Female_Total_headcount,Total_headcount,Female_Percent_Total
+VP,1,2,3,4,2,6,4,9,50%,33%,22,91,24%
+Director,6,6,12,16,25,41,31,53,19%,23%,120,510,24%
+Manager,15,15,30,67,79,146,94,176,16%,17%,555,2370,23%
+Supervisor,7,8,15,17,13,30,21,45,38%,33%,184,800,23%
+Professional,,,,,,,,,,,1937,7189,27%
+,,,,,,,,,,,,,
+,,,,,,,,,,,,,
+,,,,,,,,,,,,,
+,,,,,,,,,,,,,
+career_level_bucket,Female_Percent_Total,Female_Percent_Internal,Female_Percent_Total_New_Roles,,,,,,,,,,
+VP,24%,50%,33%,,,,,,,,,,
+Director,24%,19%,23%,,,,,,,,,,
+Manager,23%,16%,17%,,,,,,,,,,
+Supervisor,23%,38%,33%,,,,,,,,,,
+Professional,27%,,,,,,,,,,,,
