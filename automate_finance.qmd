@@ -8,6 +8,9 @@ format: html
 library(tidyverse)
 library(openxlsx)
 
+start_date <- as.Date(floor_date(Sys.Date(), "year"))
+end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
+
 # read in helper functions
 source("helper_functions.R")
 
