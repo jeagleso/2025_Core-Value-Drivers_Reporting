@@ -116,11 +116,11 @@ internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_c
     reformat <- combined |> 
         rename(FY = ytd) |>  
         relocate(FY, .after = last_col()) |> 
-        relocate(ytd_value, .before = data_source)
+        relocate(ytd_value, .before = data_source) |> 
+        rename(ytd = ytd_value)
 
     return(reformat)
 }
-
 ```
 
 ```{r}
