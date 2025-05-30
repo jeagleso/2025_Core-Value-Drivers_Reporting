@@ -176,18 +176,15 @@ voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = v
                     identical(current_output, vt_current) ~ "Professional Voluntary Turnover",
                     identical(current_output, mf_vt_current) ~ "Manufacturing Voluntary Turnover",
                     TRUE ~ "Voluntary Turnover")) |> 
-        relocate(cvd, .before = data_source)
-
-
-    reformat <- combined |> 
-        rename(FY = ytd,
-                ytd_value = ytd_annualized) |> 
-        relocate(ytd_value, .before = data_source) |> 
-        relocate(FY, .after = last_col()) |> 
-        mutate(FY = case_when(data_source == "Commit/Forecast" ~ ytd_value,
-                                TRUE ~ FY))
+        relocate(cvd, .before = data_source) |> 
+        mutate(ytd_performance = first(ytd[data_source == "Commit/Forecast"])) |> 
+        relocate(ytd_performance, .before = data_source) |> 
+        mutate(FY = case_when(data_source == "Commit/Forecast" ~ ytd_annualized,
+                                TRUE ~ ytd)) |> 
+        select(-ytd, -ytd_annualized) |> 
+        rename(ytd = ytd_performance)
   
-  return(reformat)
+  return(combined)
 }
 ```
 
