@@ -149,8 +149,8 @@ voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = v
 
     ytd_annualized <- current_output[[attribute]] |> 
         filter(month == "ytd", !is.na(ytd_annualized)) |> 
-        select(-headcount, -voluntary_terminations, -month, -voluntary_turnover)
-    
+        select(segment_function, division_function, location, ytd_annualized)
+
     # get the remaining months and use forecast for months, forecast * 3 for cols starting with Q
     forecast <- ytd_annualized |> 
         mutate(forecast = ytd_annualized / 12) |> 
