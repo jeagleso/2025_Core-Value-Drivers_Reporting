@@ -58,9 +58,9 @@ monthly_data <- tibble(last_day_of_month = as.Date(last_day_of_month))
 #| label: manu_vs_prof
 
 # running professional+
-output_name <- paste0("outputs/Professional Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
+ output_name <- paste0("outputs/Professional Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
 
-pa_at <- active_and_terminated |> 
+ pa_at <- active_and_terminated |> 
   apply_general_filters() |> 
   filter(career_level_bucket != "DL_IDL")
 
