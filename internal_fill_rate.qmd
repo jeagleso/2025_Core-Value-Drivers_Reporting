@@ -158,7 +158,7 @@ if (nrow(qa_multiple_moves) > 0) {
 # all data to be shared with results
 full_df_scrubbed <- full_df |> 
   select(employee_id, worker, hire_date, time_in_job_profile_start_date, internal_external, employee_type,
-         segment_function, division_function, business_unit_sub_function, location, career_level, 
+         segment_function, division_function, business_unit_sub_function, location, location_address_country, career_level, 
          management_chain_level_2, management_chain_level_3, management_chain_level_4, management_chain_level_5,
          effective_date, date_initiated, business_process_type, business_process_reason, 
          prior_job_profile, prior_career_level, prior_comp_grade, 

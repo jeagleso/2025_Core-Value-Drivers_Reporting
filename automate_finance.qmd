@@ -15,13 +15,13 @@ end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
 source("helper_functions.R")
 
 # filepaths
-ifr_current_path <- "outputs/Internal Fill Rate Monthly 2025-01-01 to 2025-04-30.xlsx"
+ifr_current_path <- "outputs/Internal Fill Rate Monthly 2025-01-01 to 2025-05-31.xlsx"
 ifr_prev_path <- "outputs/Internal Fill Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
 
-vt_current_path <- "outputs/Professional Voluntary Turnover Rate Monthly 2025-01-01 to 2025-04-30.xlsx"
+vt_current_path <- "outputs/Professional Voluntary Turnover Rate Monthly 2025-01-01 to 2025-05-31.xlsx"
 vt_prev_path <- "outputs/Professional Voluntary Turnover Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
 
-mf_vt_current_path <- "outputs/Manufacturing Voluntary Turnover Rate Monthly 2025-01-01 to 2025-04-30.xlsx"
+mf_vt_current_path <- "outputs/Manufacturing Voluntary Turnover Rate Monthly 2025-01-01 to 2025-05-31.xlsx"
 mf_vt_prev_path <- "outputs/Manufacturing Voluntary Turnover Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
 
 # read in current and previous year
@@ -149,7 +149,7 @@ voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = v
 
     ytd_annualized <- current_output[[attribute]] |> 
         filter(month == "ytd", !is.na(ytd_annualized)) |> 
-        select(segment_function, division_function, location, ytd_annualized)
+        select(-headcount, -voluntary_terminations, -month, -voluntary_turnover)
 
     # get the remaining months and use forecast for months, forecast * 3 for cols starting with Q
     forecast <- ytd_annualized |> 
