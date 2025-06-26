@@ -1,12 +1,37 @@
 # General
 
 library(tidyverse)
+library(workdayr)
+
+# defaults to start_date first day of the previous year, end date last day of the current year, and effective_date first day of current month
+get_workday_at <- function(start_date = as.Date(floor_date(Sys.Date(), "year") - years(1)), 
+                            end_date = as.Date(floor_date(Sys.Date(), "year") + years(1) - days(1)), 
+                            effective_date = as.Date(floor_date(Sys.Date(), "month"))) {
+  
+  # use workdayr package to pull active and terminated file
+  report_path <- get_workday_report(
+    report_name = '610171734/People_Analytics_-_AT', 
+    username = Sys.getenv("WD_AT_UN"), 
+    password = Sys.getenv("WD_AT_PW"), 
+    params = list(report_start_date = start_date,
+                  report_end_date = end_date,
+                  Effective_as_of_Date = effective_date,
+                  format ='csv'), 
+    organization = 'regalrexnord',
+    filepath = tempfile(),
+    overwrite = TRUE,
+    endpoint = 'https://wd2-impl-services1.workday.com/ccx/service/customreport2/'
+  )
+
+  # read in report for assignment
+  read_csv(report_path)
+}
 
 apply_general_filters <- function(df) {
   df |> 
     filter(worker_type == "Employee") |> 
-    filter(job_family_group != "Human Resources" | is.na(job_family_group)) |> 
-    filter(segment_function != "Industrial Systems") |> 
+    filter(job_family_group != "Human Resources" | is.na(job_family_group)) |>
+    filter(segment_function != "Industrial Systems") |>
     filter(division_function != "Corp Human Resources")
 }
 
@@ -130,7 +155,39 @@ calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grou
 # get all sheets from an excel file
 read_excel_allsheets <- function(filename) {
   sheets <- readxl::excel_sheets(filename)
-  x <- lapply(sheets, function(X) readxl::read_xlsx(filename, sheet = X))
+  x <- lapply(sheets, function(X) {
+    data <- readxl::read_xlsx(filename, sheet = X)
+    
+    # If the sheet has employee_id and effective_date columns, handle duplicates
+    if(all(c("employee_id", "effective_date") %in% names(data))) {
+      # Define priority order for business_process_type
+      priority_order <- c(
+        "Promote Employee Inbound",
+        "Hire",
+        "Transfer Employee"
+      )
+      
+      # Create a factor for business_process_type with custom order
+      data <- data |>
+        mutate(
+          process_priority = case_when(
+            business_process_type %in% priority_order ~ 
+              factor(business_process_type, levels = priority_order),
+            TRUE ~ factor(business_process_type)
+          )
+        ) |>
+        # Group by employee_id and effective_date
+        group_by(employee_id, effective_date) |>
+        # Arrange by priority and take first row
+        arrange(process_priority) |>
+        slice(1) |>
+        # Remove the temporary priority column
+        select(-process_priority) |>
+        ungroup()
+    }
+    
+    return(data)
+  })
   names(x) <- sheets
   x
 }
