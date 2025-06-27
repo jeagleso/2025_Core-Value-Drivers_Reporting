@@ -138,7 +138,7 @@ calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grou
     ) |> 
     mutate(
       month = "ytd",
-      ytd_annualized = round(voluntary_turnover * (12 / length(last_day_of_month)), 4)
+      ytd_annualized = as.numeric(round(voluntary_turnover * (12 / length(last_day_of_month)), 4))
     )
   
   # combine monthly and YTD results
@@ -156,8 +156,8 @@ calculate_voluntary_turnover_monthly <- function(df = pa_at, grouping_var = grou
 read_excel_allsheets <- function(filename) {
   sheets <- readxl::excel_sheets(filename)
   x <- lapply(sheets, function(X) {
-    data <- readxl::read_xlsx(filename, sheet = X)
-    
+    data <- readxl::read_xlsx(filename, sheet = X, guess_max = 5000)
+
     # If the sheet has employee_id and effective_date columns, handle duplicates
     if(all(c("employee_id", "effective_date") %in% names(data))) {
       # Define priority order for business_process_type
