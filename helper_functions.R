@@ -9,7 +9,7 @@ get_workday_at <- function(start_date = as.Date(floor_date(Sys.Date(), "year") -
                             effective_date = as.Date(floor_date(Sys.Date(), "month"))) {
   
   # use workdayr package to pull active and terminated file
-  report_path <- get_workday_report(
+  report_path <- workdayr::get_workday_report(
     report_name = '610171734/People_Analytics_-_AT', 
     username = Sys.getenv("WD_AT_UN"), 
     password = Sys.getenv("WD_AT_PW"), 
