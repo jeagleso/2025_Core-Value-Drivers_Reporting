@@ -126,12 +126,14 @@ internal_fill_bur <- function(previous_output = ifr_prev, current_output = ifr_c
 ```{r}
 voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = vt_current, attribute = 'Segment') {
       
+      # previous year actuals
       prev <- previous_output[[attribute]] |> 
         mutate(data_source = "PY Actual") |> 
         select(-headcount, -voluntary_terminations, -ytd_annualized) |> 
         pivot_wider(names_from = month, values_from = voluntary_turnover) |> 
         select(where(is.character), "ytd", all_of(column_order))
 
+        # aop goal that is 10% improvement from previous year
       goal <- previous_output[[attribute]] |> 
         select(where(is.character), voluntary_turnover) |> 
         # filter(month != "ytd") |> 
@@ -141,15 +143,22 @@ voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = v
         pivot_wider(names_from = month, values_from = Goal) |> 
         select(where(is.character), "ytd", all_of(column_order))
 
+        # current year actuals
       current <- current_output[[attribute]]  |>
         mutate(data_source = "CY Actual") |> 
         select(-headcount, -voluntary_terminations, -ytd_annualized) |> 
         pivot_wider(names_from = month, values_from = voluntary_turnover) |> 
         select(where(is.character), "ytd", all_of(column_order_dynamic))
 
+        # extract YTD annualized value
     ytd_annualized <- current_output[[attribute]] |> 
         filter(month == "ytd", !is.na(ytd_annualized)) |> 
         select(-headcount, -voluntary_terminations, -month, -voluntary_turnover)
+
+    ytd_performance <- current_output[[attribute]] |> 
+        filter(month == "ytd") |> 
+        select(-headcount, -voluntary_terminations, -month, -ytd_annualized) |> 
+        rename(ytd_performance = voluntary_turnover)
 
     # get the remaining months and use forecast for months, forecast * 3 for cols starting with Q
     forecast <- ytd_annualized |> 
@@ -160,14 +169,17 @@ voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = v
                                         TRUE ~ forecast), .))) |> 
         select(-ytd_annualized, -forecast)
 
+    # combine ytd performance and forecast
     commit_forecast <- current |> 
         left_join(forecast) |> 
         mutate(data_source = "Commit/Forecast")
 
+    # combine all together
       combined <- prev |> 
         bind_rows(goal) |> 
         bind_rows(commit_forecast) |> 
         left_join(ytd_annualized) |> 
+        left_join(ytd_performance) |> 
         mutate(segment_function = case_when(
               segment_function == "Corporate" ~ "Corporate",
               TRUE ~ str_extract(segment_function, pattern = "\\(([^)]+)\\)"))) |> 
@@ -177,7 +189,6 @@ voluntary_turnover_bur <- function(previous_output = vt_prev, current_output = v
                     identical(current_output, mf_vt_current) ~ "Manufacturing Voluntary Turnover",
                     TRUE ~ "Voluntary Turnover")) |> 
         relocate(cvd, .before = data_source) |> 
-        mutate(ytd_performance = first(ytd[data_source == "Commit/Forecast"])) |> 
         relocate(ytd_performance, .before = data_source) |> 
         mutate(FY = case_when(data_source == "Commit/Forecast" ~ ytd_annualized,
                                 TRUE ~ ytd)) |> 
@@ -232,7 +243,8 @@ division <- vt_division |>
 
 plant <- vt_plant |> 
     bind_rows(ifr_plant) |> 
-    bind_rows(mf_vt_plant)
+    bind_rows(mf_vt_plant) |> 
+    mutate(division_function = str_replace(division_function, "AMC India/Middle East", "AMC India Middle East"))
 ```
 
 ```{r}
