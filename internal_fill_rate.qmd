@@ -162,7 +162,7 @@ full_df_scrubbed <- full_df |>
          management_chain_level_2, management_chain_level_3, management_chain_level_4, management_chain_level_5,
          effective_date, date_initiated, business_process_type, business_process_reason, 
          prior_job_profile, prior_career_level, prior_comp_grade, 
-         new_job_profile, new_career_level, new_comp_grade) |> 
+         new_job_profile, new_job_family, new_career_level, new_comp_grade) |> 
   mutate_at(vars(contains("date")), as.Date) |> 
   arrange(time_in_job_profile_start_date)
 ```
