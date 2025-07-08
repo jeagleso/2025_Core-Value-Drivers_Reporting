@@ -40,3 +40,16 @@ may_hc_re |>
     group_by(career_level_bucket, minority_status) |>
     summarize(n = n()) |>
     mutate(percent = round(n / sum(n), 2))
+
+# use to get HR turnover
+pa_at <- active_and_terminated |> 
+    filter(worker_type == "Employee") |> 
+    filter(segment_function != "Industrial Systems") |> 
+    filter(career_level_bucket != "DL_IDL")
+
+monthly_turnover_data <- map(grouping_vars, ~ calculate_voluntary_turnover_monthly(pa_at, .x)) |> 
+  set_names(output_sheet_names)
+
+monthly_turnover_data$`Segment by Division` |> 
+    filter(division_function == "Corp Human Resources",
+            month == "ytd")
