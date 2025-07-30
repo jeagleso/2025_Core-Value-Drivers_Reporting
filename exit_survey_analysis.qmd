@@ -1,0 +1,55 @@
+---
+title: "Exit Survey Analysis"
+format: html
+---
+
+```{r}
+library(tidyverse)
+
+# load survey data
+survey_data <- readxl::read_xlsx("inputs/RRX_-_PA_-_Exit_Survey_Responses.xlsx", skip = 2) |> 
+    janitor::clean_names() |> 
+    select(employee_id, starts_with("q"))
+
+# load pa at
+pa_at <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 4) |> 
+    janitor::clean_names() 
+
+# only 2025 professional voluntary terms
+terms <- pa_at |> 
+    filter(termination_date > "2024-12-21" & termination_date < "2026-01-01") |> 
+    filter(!is.na(career_level)) |> 
+    filter(termination_category == "Terminate Employee > Voluntary")
+
+# combine term data and survey data
+full_df <- terms |> 
+    left_join(survey_data)
+```
+
+# Summary Information
+
+- 17 likert items
+- 1 reason for leaving
+- 5 open-ended
+
+```{r}
+# transpose to long format and add col summaries
+survey_data_long <- survey_data |> 
+    pivot_longer(cols = starts_with("q"), 
+                names_to = "item", 
+                values_to = "response") |> 
+    mutate(score = case_when(
+        response == "Strongly Agree" ~ 5,
+        response == "Agree" ~ 4,
+        response == "Neither Agree nor Disagree" ~ 3,
+        response == "Disagree" ~ 2,
+        response == "Strongly Disagree" ~ 1,
+        TRUE ~ 0
+    )) |> 
+    mutate(favorability = case_when(
+        score > 3 ~ 1,
+        TRUE ~ 0
+    ))
+```
+
+## Suvey Items and Overall Responses
