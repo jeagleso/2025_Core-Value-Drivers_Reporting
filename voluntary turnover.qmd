@@ -35,7 +35,11 @@ end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
 # # get active and terminated, add career_level bucket
 active_and_terminated <- readxl::read_xlsx("inputs/People Analytics - AT.xlsx", skip = 4) |> 
   janitor::clean_names() |> 
-  add_buckets()
+  add_buckets() |> 
+  # replacing the placeholder division that can't be updated for termed employees
+  mutate(division_function = str_replace(division_function, 
+                                        "AMC Thomson Linear Motion - General (Move to AMC Linear Motion Division)", 
+                                        "AMC Linear Motion Division"))
 
 # use for 2024 file
 # start_date <- as.Date("2024-01-01")
