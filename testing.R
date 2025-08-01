@@ -31,3 +31,46 @@ tmp_forecast <- tmp |>
   select(1:ytd) |> 
   bind_cols(remaining_months_tibble) |> 
   mutate(across(everything(), ~ ifelse(is.na(.), ytd, .)))
+
+tmp_vt_current <- vt_current <- read_excel_allsheets(filename = "tmp.xlsx")
+
+tmp_div_loc <- readxl::read_xlsx("tmp.xlsx", sheet = "Division by Location", col_types = c("guess", "guess", "guess", "numeric", "numeric", "guess", "numeric", "numeric"))
+
+
+
+tmp_vt_current$`Division by Location`<- tmp_vt_current$`Division by Location` |> 
+        mutate(ytd_annualized = as.numeric(ytd_annualized))
+
+tmp_mfr_fy <- vt_current$`Division by Location` |> 
+        filter(month == "ytd", !is.na(ytd_annualized)) |> 
+        select(-headcount, -voluntary_terminations, -month, -voluntary_turnover)
+
+
+vt_current$Segment |> 
+        filter(month == "ytd") |> 
+        select(-headcount, -voluntary_terminations, -month, -ytd_annualized) |> 
+        rename(ytd_performance = voluntary_turnover)
+
+vt_current$Segment |> 
+        filter(month == "ytd", !is.na(ytd_annualized)) |> 
+        select(-headcount, -voluntary_terminations, -month, -voluntary_turnover)
+
+library(workdayr)
+
+# Get report raw data
+report_path <- get_workday_report(
+  report_name = '610171734/People_Analytics_-_AT', 
+  username = Sys.getenv("WD_AT_UN"), 
+  password = Sys.getenv("WD_AT_PW"), 
+  params = list(report_start_date ='2025-01-01',
+                report_end_date = '2025-04-01',
+                Effective_as_of_Date = '2025-04-01',
+                format ='csv'), 
+  organization = 'regalrexnord',
+  filepath = tempfile(),
+  overwrite = TRUE,
+  endpoint = 'https://wd2-impl-services1.workday.com/ccx/service/customreport2/'
+)
+
+# read it in as a tibble
+tmp <- readr::read_csv(report_path)
