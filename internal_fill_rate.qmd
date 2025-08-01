@@ -86,6 +86,10 @@ df_pa_at <- readxl::read_xlsx(file_path_pa_at, skip = 4) |>
   janitor::clean_names() |>
   mutate(time_in_job_profile_start_date = as.Date(time_in_job_profile_start_date)) |> 
   add_buckets() |>
+  # replacing the placeholder division that can't be updated for termed employees
+  mutate(division_function = str_replace(division_function, 
+                                        "AMC Thomson Linear Motion - General (Move to AMC Linear Motion Division)", 
+                                        "AMC Linear Motion Division")) |> 
   mutate(internal_external = case_when(
     hire_date == time_in_job_profile_start_date ~ "External",
     hire_date < time_in_job_profile_start_date ~ "Internal",
