@@ -15,13 +15,13 @@ end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
 source("helper_functions.R")
 
 # filepaths
-ifr_current_path <- "outputs/Internal Fill Rate Monthly 2025-01-01 to 2025-05-31.xlsx"
+ifr_current_path <- paste0("outputs/Internal Fill Rate Monthly ", start_date, " to ", end_date, ".xlsx")
 ifr_prev_path <- "outputs/Internal Fill Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
 
-vt_current_path <- "outputs/Professional Voluntary Turnover Rate Monthly 2025-01-01 to 2025-05-31.xlsx"
+vt_current_path <- paste0("outputs/Professional Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
 vt_prev_path <- "outputs/Professional Voluntary Turnover Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
 
-mf_vt_current_path <- "outputs/Manufacturing Voluntary Turnover Rate Monthly 2025-01-01 to 2025-05-31.xlsx"
+mf_vt_current_path <- paste0("outputs/Manufacturing Voluntary Turnover Rate Monthly ", start_date, " to ", end_date, ".xlsx")
 mf_vt_prev_path <- "outputs/Manufacturing Voluntary Turnover Rate Monthly 2024-01-01 to 2024-12-31.xlsx"
 
 # read in current and previous year
