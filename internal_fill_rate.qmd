@@ -127,8 +127,6 @@ worker_changes <- df_worker_changes |>
   filter(business_process_type != "Promote Employee Outbound") 
 ```
 
-
-
 ```{r}
 #| label: join_data
 
@@ -155,6 +153,13 @@ if (nrow(qa_multiple_moves) > 0) {
 }
 ```
 
+```{r}
+# MANUAL CORRECTION
+# this was supposed to be a realignment but positions were changed
+full_df <- full_df |> 
+  filter(!(division_function == "IPS Couplings Division" & 
+          business_process_type == "Edit Position"))
+```
 
 ```{r}
 #| label: data_to_share
