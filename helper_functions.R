@@ -3,6 +3,14 @@
 library(tidyverse)
 library(workdayr)
 
+# theme colors
+r_darkblue <- "#002F6C"
+r_green <- "#71B840"
+r_gray <- "#6D6F71"
+r_lightblue <- "#648EB6"
+r_brightblue <- "#00B0F0"
+r_orange <- "#E97132"
+
 # defaults to start_date first day of the previous year, end date last day of the current year, and effective_date first day of current month
 get_workday_at <- function(start_date = as.Date(floor_date(Sys.Date(), "year") - years(1)), 
                             end_date = as.Date(floor_date(Sys.Date(), "year") + years(1) - days(1)), 
