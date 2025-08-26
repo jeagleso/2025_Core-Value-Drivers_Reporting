@@ -75,6 +75,21 @@ output_sheet_names <- c("Enterprise",
 ### Voluntary Turnover
 
 
+#' Calculate monthly, quarterly, and YTD voluntary turnover with stable types
+#'
+#' @param df A data frame with at least the columns:
+#'   hire_date, termination_date, termination_category, and grouping columns.
+#' @param grouping_var A character vector of column names to group by.
+#'   If NULL, an "Enterprise" grouping level will be created.
+#'
+#' @return A tibble with columns:
+#'   <grouping_var>, month (chr), voluntary_terminations (dbl),
+#'   headcount (dbl), voluntary_turnover (dbl), ytd_annualized (dbl)
+#'
+#' Notes:
+#' - `termination_category` is filtered to "Terminate Employee > Voluntary".
+#' - `last_day_of_month` is expected to be available in the environment.
+#'
 #| label: calculate_turnover_at_file
 
 # type is professional or manufacturing
