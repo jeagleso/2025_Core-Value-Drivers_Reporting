@@ -48,7 +48,7 @@ viz_vt_historical |>
   geom_line(size = 1.2) +
   geom_point(size = 1.2) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 0.1), limits = c(0, 0.015)) +
-  scale_color_manual(values = c("2024" = "green", "2025" = "blue")) +
+  scale_color_manual(values = c("2024" = r_green, "2025" = r_darkblue)) +
   labs(
     title = "Monthly Voluntary Turnover vs. 2024",
     x = NULL,
