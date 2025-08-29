@@ -50,8 +50,8 @@ source("helper_functions.R")
 
 # specify period: first date of current year and last day of previous month
 start_date <- as.Date(floor_date(Sys.Date(), "year"))
-end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
-
+# end_date <- as.Date(floor_date(Sys.Date(), "month") - days(1))
+end_date <- "2025-08-31"
 # file path for active and terminated
 file_path_pa_at <- "inputs/People Analytics - AT.xlsx"
 
@@ -134,7 +134,7 @@ worker_changes <- df_worker_changes |>
 
 # join data together matching on employee id and effective date/job profile start date
 # apply filters to get target population
-full_df <- pa_at |> 
+full_df_no_exceptions <- pa_at |> 
   left_join(worker_changes, by = c("employee_id", 
                                          "time_in_job_profile_start_date" = "effective_date"), keep = TRUE) |> 
   apply_general_filters() |> 
@@ -144,7 +144,7 @@ full_df <- pa_at |>
   select(-employee_id.y) 
 
 # validation: check if many-to-many caused from multiple moves
-qa_multiple_moves <- full_df %>%
+qa_multiple_moves <- full_df_no_exceptions %>%
   group_by(employee_id) %>%
   filter(n() > 1) %>%
   ungroup()
@@ -158,10 +158,10 @@ if (nrow(qa_multiple_moves) > 0) {
 ```{r}
 # MANUAL CORRECTION
 # this was supposed to be a realignment but positions were changed
-full_df <- full_df |> 
+full_df <- full_df_no_exceptions |> 
   filter(!(division_function == "IPS Couplings Division" & 
           business_process_type == "Edit Position")) |> 
-  filter(prior_job_profile != "Title Mapping in Progress (DL)")
+  filter(is.na(prior_job_profile) | prior_job_profile != "Title Mapping in Progress (DL)")
 ```
 
 ```{r}
