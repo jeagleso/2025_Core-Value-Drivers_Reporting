@@ -112,7 +112,8 @@ pa_at <- df_pa_at |>
 
 # read in worker changes
 df_worker_changes_raw <- readxl::read_xlsx(file_path_worker_changes, skip = 7) |> 
-  janitor::clean_names() 
+  janitor::clean_names() |> 
+  rename(prior_segment_assignment = previous_segment_assignment)
 
 # if an employee has more than one business process reason on an effective date, remove transfer to another manager
 df_worker_changes <- df_worker_changes_raw |> 
@@ -120,7 +121,8 @@ df_worker_changes <- df_worker_changes_raw |>
   filter(!(n() > 1 & business_process_reason == "Transfer > Transfer > Move to another Manager")) |> 
   ungroup() |> 
   select(employee_id, effective_date, date_initiated, business_process_type, business_process_reason, 
-         starts_with("prior_"), starts_with("new_")) 
+         starts_with("prior_"), starts_with("new_"),
+         current_segment_assignment) 
 
 # remove duplicate row for promotions - both inbound and outbound on report
 worker_changes <- df_worker_changes |>
@@ -171,8 +173,8 @@ full_df_scrubbed <- full_df |>
          segment_function, division_function, business_unit_sub_function, location, location_address_country, career_level, 
          management_chain_level_2, management_chain_level_3, management_chain_level_4, management_chain_level_5,
          effective_date, date_initiated, business_process_type, business_process_reason, 
-         prior_job_profile, prior_career_level, prior_comp_grade, 
-         new_job_profile, new_job_family, new_career_level, new_comp_grade) |> 
+         prior_job_profile, prior_career_level, prior_comp_grade, prior_segment_assignment,
+         new_job_profile, new_job_family, new_career_level, new_comp_grade, current_segment_assignment) |> 
   mutate_at(vars(contains("date")), as.Date) |> 
   arrange(time_in_job_profile_start_date)
 ```
